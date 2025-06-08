@@ -16,4 +16,4 @@ source activate
 conda activate lmabo
 
 # Run the Python script
-python run.py --problem $problem --bo_flag --plot_flag
+python run.py --problem $problem --method $method --plot_flag

@@ -7,8 +7,10 @@ import re
 from google.api_core.exceptions import ResourceExhausted
 
 from bo import *
+from key import API_KEY
+from utils import get_shortest_distance_from_last_point
 
-genai.configure(api_key="YourAPIKey")  # Replace with your actual API key
+genai.configure(api_key=API_KEY)  # Replace with your actual API key
 MAX_RETRIES = 10
 MAX_DELAY_SECONDS = 120
 INITIAL_DELAY_SECONDS = 1
@@ -65,63 +67,6 @@ Current optimization state:
 FINAL_GUESS = """
 Now that you have finished the optimization process, can you guess which function is this?
 """
-
-def get_shortest_distance_from_last_point(X, bounds):
-    """
-    Calculates the shortest Euclidean distance between the last point
-    and all other points in a PyTorch tensor, after normalizing the points
-    to a [0,1]^D hypercube based on the provided bounds.
-
-    Args:
-        points_tensor: A PyTorch tensor of shape (N, D), where N is the number
-                       of points and D is the number of dimensions.
-                       Assumes points_tensor values are within the given bounds.
-        bounds_tensor: A PyTorch tensor of shape (2, D), where the first row
-                       contains the lower bounds for each dimension and the second row
-                       contains the upper bounds for each dimension.
-
-    Returns:
-        The shortest Euclidean distance in the normalized [0,1]^D space as a float.
-
-    Raises:
-        ValueError: If the input tensor has fewer than 2 points, or if bounds are invalid.
-    """
-    if X.shape[0] < 2:
-        raise ValueError("Points tensor must contain at least 2 points to calculate distances.")
-    if bounds.shape != (2, X.shape[1]):
-        raise ValueError(f"Bounds tensor must have shape (2, D) where D is {X.shape[1]}. "
-                         f"Received shape: {bounds.shape}")
-    if torch.any(bounds[0] >= bounds[1]):
-        raise ValueError("Lower bounds must be strictly less than upper bounds in all dimensions.")
-
-    # Extract lower and upper bounds
-    lower_bounds = bounds[0, :]
-    upper_bounds = bounds[1, :]
-
-    # Calculate the range (width) of each dimension
-    ranges = upper_bounds - lower_bounds
-
-    # Normalize the points to the [0,1]^D hypercube
-    # This ensures distances are comparable across dimensions of different scales
-    # Add a small epsilon to ranges to prevent division by zero for fixed dimensions if any
-    epsilon = 1e-9
-    normalized_points = (X - lower_bounds) / (ranges + epsilon)
-
-    # The last normalized point
-    normalized_last_point = normalized_points[-1:, :]
-
-    # All other normalized points
-    normalized_other_points = normalized_points[:-1, :]
-
-    # Calculate Euclidean distance between the normalized last point and each of the other normalized points
-    # torch.cdist is efficient for batch distances
-    # The output 'distances' will be a (N-1, 1) tensor
-    distances = torch.cdist(normalized_other_points, normalized_last_point, p=2)
-
-    # Find the minimum distance among them and convert to a Python float
-    shortest_dist = torch.min(distances).item()
-
-    return shortest_dist
 
 def suggest_acq_type(chat, train_X, train_Y, acq_type_list, bounds, lengthscales, outputscale, remaining_iterations):
     # --- NEW: Calculate shortest distance of the last point relative to bounds ---
@@ -213,16 +158,6 @@ def suggest_acq_type(chat, train_X, train_Y, acq_type_list, bounds, lengthscales
         print(f"Failed to get LLM response for iteration {len(acq_type_list)} after {MAX_RETRIES} retries. Using default AF.")
         return "UCB", chat
     return llm_suggested_af, chat
-    
-def check_available_model():
-    # List all available models
-    print("Listing available models and their supported methods:")
-    for m in genai.list_models():
-        # Check if the model supports the 'generateContent' method
-        if 'generateContent' in m.supported_generation_methods:
-            print(f"  Model Name: {m.name}, Supported Methods: {m.supported_generation_methods}")
-        else:
-            print(f"  Model Name: {m.name}, (Does NOT support generateContent)")
 
 def last_guess(chat):
     try:
@@ -241,7 +176,6 @@ def lm_assisted_adaptive_bo(objective_func, X_init, Y_init, bounds, num_iteratio
     best_values = [train_Y.min().item()]
     acq_type_list = []
     # init LLM
-    # check_available_model()
     model = genai.GenerativeModel(
         'gemini-2.5-flash-preview-05-20', 
     )
@@ -264,7 +198,7 @@ def lm_assisted_adaptive_bo(objective_func, X_init, Y_init, bounds, num_iteratio
     lengthscales = gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
     outputscale = gp.covar_module.outputscale.detach().cpu().numpy()
     remaining_iterations = num_iterations
-    for i in range(num_iterations):
+    for _ in range(num_iterations):
         # use LLM to suggest the best acq_type
         acq_type, chat = suggest_acq_type(
             chat, 
