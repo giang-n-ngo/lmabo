@@ -1,0 +1,158 @@
+```python
+_previous_f_min = float('inf')
+_last_chosen_acq = None
+_failed_acq_functions = set()
+
+def recommend_acquisition_function(N, Remaining_iterations, D, f_min, Shortest_distance, Model_lengthscales, Model_outputscale):
+    global _previous_f_min, _last_chosen_acq, _failed_acq_functions
+
+    # 1. Check for "failure" of the previously used acquisition function
+    if _last_chosen_acq is not None:
+        epsilon = 1e-6 # A small threshold for numerical stability
+        if f_min >= _previous_f_min - epsilon: # If current f_min is not significantly better
+            _failed_acq_functions.add(_last_chosen_acq)
+    
+    # 2. Update previous_f_min for the next iteration's check
+    _previous_f_min = f_min
+
+    # 3. Determine optimization phase and conditions
+    total_iterations = N + Remaining_iterations
+    progress = N / total_iterations if total_iterations > 0 else 0.0
+
+    ls_min, ls_max, ls_mean, ls_std = Model_lengthscales
+    is_complex_function = (ls_mean < 0.1 * D) or (ls_std / ls_mean > 0.5) # Heuristic for complexity based on relative std
+    is_over_exploiting = (Shortest_distance < 1e-3) # Shortest distance indicating too much local search
+
+    # Define candidate acquisition functions by general purpose
+    candidate_acqs_early_explore = ["TS", "qPES", "qMES", "UCB", "PosSTD"]
+    candidate_acqs_balanced = ["EI", "TS", "qPES", "qMES", "LogEI"]
+    candidate_acqs_late_exploit = ["EI", "LogEI", "PI", "LogPI", "TS"]
+    
+    # Prioritized list of ACQs to try
+    acq_recommendations = []
+
+    # Very Early Stage (N is small, not enough points for a good model)
+    if N < max(5, D):
+        acq_recommendations.extend(candidate_acqs_early_explore)
+        
+    # Early Stage (more exploration needed, or function is complex, or over-exploiting)
+    elif progress < 0.35 or is_complex_function or is_over_exploiting or N < max(10, 2*D):
+        if is_over_exploiting:
+            acq_recommendations.extend(["TS", "UCB", "qPES", "qMES", "PosSTD", "EI"]) # Prioritize exploration heavily
+        else:
+            acq_recommendations.extend(candidate_acqs_balanced) # General exploration
+            acq_recommendations.extend(["UCB", "PosSTD"]) # Add more explicit exploration options
+
+    # Mid Stage (balancing exploration and exploitation)
+    elif progress < 0.75:
+        acq_recommendations.extend(candidate_acqs_balanced)
+        acq_recommendations.extend(["UCB"]) # Still some exploration
+
+    # Late Stage (exploitation focus)
+    else: # progress >= 0.75 or Remaining_iterations is small
+        if not is_complex_function: # If function is smooth, more aggressive exploitation
+            acq_recommendations.extend(candidate_acqs_late_exploit)
+            acq_recommendations.extend(["PI", "LogPI"]) # More aggressive PI
+        else: # If complex even late, maintain some balance
+            acq_recommendations.extend(candidate_acqs_balanced)
+            acq_recommendations.extend(["PI", "LogPI"])
+
+    # Fallback/Comprehensive order (ensures we always pick something not failed)
+    fallback_order = ["EI", "TS", "LogEI", "UCB", "qMES", "qPES", "qJES", "PI", "LogPI", "PosSTD", "PosMean", "qKG"]
+    for acq in fallback_order:
+        if acq not in acq_recommendations: # Add any missing from specific stages to ensure coverage
+            acq_recommendations.append(acq)
+
+    # 4. Select the first available non-failed acquisition function
+    chosen_acq = None
+    justification = ""
+
+    for acq in acq_recommendations:
+        if acq not in _failed_acq_functions:
+            chosen_acq = acq
+            break
+    
+    # 5. Generate justification
+    if chosen_acq == "TS":
+        justification = "Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages."
+    elif chosen_acq == "EI":
+        justification = "Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress."
+    elif chosen_acq == "LogEI":
+        justification = "Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation."
+    elif chosen_acq == "UCB":
+        justification = "Emphasizes exploration by prioritizing high confidence bounds, useful for broad space coverage."
+    elif chosen_acq == "PosSTD":
+        justification = "Pure exploration, effectively maps the entire search space to reduce uncertainty."
+    elif chosen_acq == "qPES" or chosen_acq == "qMES" or chosen_acq == "qJES":
+        justification = f"{chosen_acq}: Efficiently reduces uncertainty about the global optimum, strong for information gathering."
+    elif chosen_acq == "PI":
+        justification = "Aggressively exploits current best, suitable for late-stage refinement when a clear optimum is near."
+    elif chosen_acq == "LogPI":
+        justification = "Aggressively exploits for very small improvements, suitable for very late-stage fine-tuning."
+    elif chosen_acq == "PosMean":
+        justification = "Pure exploitation, selects the point with the highest posterior mean (use with caution in late stages)."
+    elif chosen_acq == "qKG":
+        justification = "Optimizes for the expected future improvement, powerful but computationally intensive."
+    else:
+        justification = "Default choice when other specific strategies are exhausted or failed." # Should not happen if fallback is comprehensive
+
+    _last_chosen_acq = chosen_acq
+    return f"{chosen_acq}: {justification}"
+```
+
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+qPES: Efficiently reduces uncertainty about the global optimum, strong for information gathering.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+UCB: Emphasizes exploration by prioritizing high confidence bounds, useful for broad space coverage.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+qMES: Efficiently reduces uncertainty about the global optimum, strong for information gathering.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+qJES: Efficiently reduces uncertainty about the global optimum, strong for information gathering.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+UCB: Emphasizes exploration by prioritizing high confidence bounds, useful for broad space coverage.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+qMES: Efficiently reduces uncertainty about the global optimum, strong for information gathering.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+PI: Aggressively exploits current best, suitable for late-stage refinement when a clear optimum is near.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+PI: Aggressively exploits current best, suitable for late-stage refinement when a clear optimum is near.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+TS: Balances exploration and exploitation effectively by sampling from the posterior, robust for various stages.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+PI: Aggressively exploits current best, suitable for late-stage refinement when a clear optimum is near.
+PosSTD: Pure exploration, effectively maps the entire search space to reduce uncertainty.
+LogEI: Suitable for fine-tuning when improvements are expected to be small, provides robust exploitation.
+EI: Standard balanced choice, effectively weighing improvement and uncertainty, good for general progress.
+LogPI: Aggressively exploits for very small improvements, suitable for very late-stage fine-tuning.
+PosMean: Pure exploitation, selects the point with the highest posterior mean (use with caution in late stages).
+qKG: Optimizes for the expected future improvement, powerful but computationally intensive.
+PI: Aggressively exploits current best, suitable for late-stage refinement when a clear optimum is near.
+Based on the optimization history, especially the prolonged plateaus in `f_min` (e.g., from N=11 to N=29, then again from N=31 to N=46, and N=48 to N=57) followed by sudden drops, it is highly indicative that the black-box function is **multi-modal**.
+
+The optimizer appeared to get "stuck" in local minima for significant periods, requiring a shift in strategy (sometimes more exploration, other times aggressive exploitation) to find better optima. The fluctuating and sometimes very large model lengthscales, along with high outputscale, also suggest a function with varying degrees of smoothness and significant variations in its landscape. The periods of very short "shortest distance" further support the idea of the optimizer exploiting promising local regions.
+
+Therefore, this function is likely a **complex, multi-modal function with several local optima**, making it challenging for global optimization.
