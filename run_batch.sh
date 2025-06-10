@@ -1,8 +1,18 @@
 #!/bin/bash
 
 # Define the problems and algorithms
-# problems=("Ackley" "Branin" "DixonPrice" "Easom" "Griewank" "Levy" "Powell" "Rastrigin" "Rosenbrock" "StyblinskiTang" "Beale" "Bukin" "Cosine8" "DropWave" "EggHolder" "Hartmann" "HolderTable" "Michalewicz" "Shekel" "SixHumpCamel")
-problems=("Bukin" "Cosine8" "DropWave" "Hartmann")
+# problems=(
+#     "Ackley" "Beale" "Branin" "Bukin" "Cosine8" 
+#     "DixonPrice" "DropWave" "EggHolder" "Griewank" 
+#     "Hartmann" "HolderTable" "Levy" "Michalewicz" "Powell" 
+#     "Rastrigin" "Rosenbrock" "Shekel" "SixHumpCamel" "StyblinskiTang" 
+#     "Sphere" "Ellipsoid" "BucheRastrigin" "LinearSlope" "AttractiveSector" 
+#     "StepEllipsoid" "RosenbrockRotated" "Ellipsoid2" "Discus" "BentCigar" 
+#     "SharpRidge" "DifferentPowers" "Weierstrass" "Schaffers" 
+#     "SchaffersIllCond" "CompositeGriewankRosenbrock" "Schwefel" "Gallagher21" 
+#     "Gallagher101" "Katsuura" "LunacekBiRastrigin"
+# )
+problems=("Cosine8")
 method="lmabo"
 
 # Loop over each problem and algorithm
