@@ -1,11 +1,10 @@
 from bo import bo_full_loop, acq_type_mapping, prepare_objective_func
-from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR, FIG_DIR
+from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR
 from lmabo import lm_assisted_adaptive_bo
-from utils import plot_results
+from utils import plot_results_best_value
 
 import argparse
 from botorch.test_functions import *
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 import torch
@@ -14,15 +13,22 @@ from torch.quasirandom import SobolEngine
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.double  # Use double precision for GP models
 
-def check_result_complete(folder_path):
-    if not os.path.exists(folder_path):
-        count = 0
-    else:
-        count = len([f for f in os.listdir(folder_path) if os.path.isfile(os.path.join(folder_path, f))])
-    if count < EXP_RUNS:
-        return False
-    else:
-        return True
+def save_results(folder_path, exp_idx, simple_regret, cum_regret, train_X, train_Y):
+    """
+    Save the results of the optimization run.
+    
+    Args:
+        folder_path: str, path to the folder where results will be saved
+        exp_idx: int, index of the experiment run
+        simple_regret: numpy array, simple regret values
+        cum_regret: numpy array, cumulative regret values
+        train_X: torch tensor, training input points
+        train_Y: torch tensor, training output values
+    """
+    np.save(f"{folder_path}/{exp_idx}_simple_regret.npy", simple_regret)
+    np.save(f"{folder_path}/{exp_idx}_cum_regret.npy", cum_regret)
+    np.save(f"{folder_path}/{exp_idx}_train_X.npy", train_X)
+    np.save(f"{folder_path}/{exp_idx}_train_Y.npy", train_Y)
 
 def run_problem(problem, acq_type=None):
     print(f"Running {acq_type}")
@@ -37,7 +43,7 @@ def run_problem(problem, acq_type=None):
     os.makedirs(folder_path, exist_ok=True)
     for exp_idx in range(EXP_RUNS):
         print(f"RUN {exp_idx}")
-        if os.path.exists(f"{folder_path}/{exp_idx}.npy"):
+        if os.path.exists(f"{folder_path}/{exp_idx}_train_X.npy"):
             print("Completed!")
             continue
         # Generate initial training data
@@ -46,26 +52,42 @@ def run_problem(problem, acq_type=None):
         fixed_train_Y  = objective_func(fixed_train_X).unsqueeze(-1) # Evaluate function and reshape
         if acq_type != "lmabo":
             # run fixed acq_type
-            best_values = bo_full_loop(
+            simple_regret, cum_regret, train_X, train_Y = bo_full_loop(
                 objective_func, 
                 acq_type, 
                 fixed_train_X, fixed_train_Y, 
                 bounds,
                 num_iterations
             )
-            np.save(f"{folder_path}/{exp_idx}.npy", best_values)  
+            save_results(
+                folder_path, 
+                exp_idx, 
+                simple_regret, 
+                cum_regret, 
+                train_X, 
+                train_Y
+            ) 
         else:
             # run LMABO
-            best_values, acq_type_list = lm_assisted_adaptive_bo(
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = lm_assisted_adaptive_bo(
                 objective_func, 
                 fixed_train_X, fixed_train_Y, 
                 bounds, 
                 num_iterations
             )
-            np.save(f"{folder_path}/{exp_idx}.npy", best_values)
-            # save acq_type_list as text in one line for analysis
-            with open(f"{folder_path}/{exp_idx}_acq_types.txt", "w") as f:
-                f.write(" ".join(acq_type_list))
+            save_results(
+                folder_path, 
+                exp_idx, 
+                simple_regret, 
+                cum_regret, 
+                train_X, 
+                train_Y
+            ) 
+            # save both acq_type_list and messages
+            with open(f"{folder_path}/{exp_idx}_acq_types.txt", "w") as f1, \
+                open(f"{folder_path}/{exp_idx}_messages.txt", "w") as f2:
+                f1.write("\n".join(acq_type_list))
+                f2.write("\n".join(messages))
 
 if __name__=="__main__":
     argparser = argparse.ArgumentParser()
@@ -93,4 +115,4 @@ if __name__=="__main__":
     elif args.method == "lmabo":
         run_problem(args.problem, "lmabo")
     if args.plot_flag:
-        plot_results(args.problem)
+        plot_results_best_value(args.problem)

@@ -1,5 +1,4 @@
 import numpy as np
-import os
 import torch
 from botorch.test_functions import *
 from botorch.models import SingleTaskGP
@@ -14,7 +13,6 @@ from botorch.acquisition.analytic import (
     PosteriorStandardDeviation
 )
 from botorch.acquisition.knowledge_gradient import qKnowledgeGradient
-from botorch.acquisition.logei import qLogExpectedImprovement
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
 from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.max_value_entropy_search import qLowerBoundMaxValueEntropy
@@ -22,11 +20,9 @@ from botorch.acquisition.utils import get_optimal_samples
 from botorch.generation import MaxPosteriorSampling
 from botorch.optim import optimize_acqf
 from botorch.models.transforms import Normalize, Standardize
-from botorch.sampling import SobolQMCNormalSampler
 from gpytorch.mlls import ExactMarginalLogLikelihood
-from gpytorch.kernels import MaternKernel, ScaleKernel, RBFKernel
+from gpytorch.kernels import MaternKernel, ScaleKernel
 from torch.quasirandom import SobolEngine
-from tqdm import tqdm
 
 from test_functions import *
 from constants import *
@@ -59,35 +55,54 @@ def prepare_objective_func(problem):
         if item.__name__ == problem:
             f = item
             break
+        elif hasattr(item, "name") and item.name == problem:
+            f = item
+            break
     dim = 0
-    if hasattr(f, "dim"):
-        dim = f.dim
-        objective_func = f().to(dtype=dtype, device=device)
-    elif f.__name__ == 'Hartmann': 
-        dim = 6
-        objective_func = f().to(dtype=dtype, device=device)
-    else:  
+    if f in DIMS:  
         dim = DIMS[f]
         objective_func = f(dim=dim).to(dtype=dtype, device=device)
+    else:
+        dim = f.dim
+        objective_func = f().to(dtype=dtype, device=device)
     bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
+    if problem == "Cosine8":
+        # Fix incorrect optimal value for Cosine8
+        objective_func._optimal_value = -8.8
     return objective_func, dim, bounds
 
-def calculate_cumulative_regret(observations, true_minimum):
+def calculate_auc_simple_regret(best_values, true_minimum):
     """
-    Calculate cumulative regret for a minimization problem.
+    Calculate the AUC of the simple regret curve for a minimization problem.
     
     Args:
-        observations: numpy array of best observed values at each iteration
+        best_values: numpy array of best observed values at each iteration
         true_minimum: float, true global minimum of the objective function
         
     Returns:
-        numpy array of cumulative regret values
+        AUC value as a float
     """
     # Calculate simple regret at each iteration
-    simple_regret = observations - true_minimum
+    simple_regret = best_values - true_minimum
     
     # Calculate cumulative regret
-    cumulative_regret = np.cumsum(simple_regret)
+    auc_regret = np.cumsum(simple_regret)[-1]
+    
+    return auc_regret
+
+def calculate_cumulative_regret(observations, true_minimum):
+    """
+    Calculate the cumulative regret over the iterations.
+    
+    Args:
+        observations: numpy array of observed values at each iteration
+        true_minimum: float, true global minimum of the objective function
+        
+    Returns:
+        Cumulative regret as a numpy array
+    """
+    # Calculate cumulative regret
+    cumulative_regret = np.cumsum(observations - true_minimum)
     
     return cumulative_regret
 
@@ -114,7 +129,7 @@ def bo_single_iteration(
     objective_func,
     bounds
 ):
-    if acq_type in ["qKG", "TS"]:
+    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
         flip = -1
     else:
         flip = 1
@@ -136,29 +151,7 @@ def bo_single_iteration(
         acq_func = PosteriorStandardDeviation(model=gp, maximize=False)
     elif acq_type == "qKG":
         acq_func = qKnowledgeGradient(model=gp, num_fantasies=4)
-    elif acq_type == "qPES":
-        gp_cpu = fit_gp(
-            train_X.cpu(),
-            train_Y.cpu() * flip
-        )
-        optimal_inputs, _ = get_optimal_samples(
-            model=gp_cpu, 
-            bounds=bounds.cpu(), 
-            num_optima=12
-        )
-        del gp_cpu  # Free memory
-        acq_func = qPredictiveEntropySearch(
-            model=gp, 
-            optimal_inputs=optimal_inputs.to(train_X), 
-            maximize=False
-        )
-    elif acq_type == "qMES":
-        acq_func = qLowerBoundMaxValueEntropy(
-            model=gp,
-            candidate_set=torch.rand(1000, dim).to(train_X.dtype).to(train_X.device),
-            maximize=False
-        )
-    elif acq_type == "qJES":
+    elif acq_type in ["qPES", "qJES"]:
         gp_cpu = fit_gp(
             train_X.cpu(),
             train_Y.cpu() * flip
@@ -169,10 +162,22 @@ def bo_single_iteration(
             num_optima=12
         )
         del gp_cpu  # Free memory
-        acq_func = qJointEntropySearch(
+        if acq_type == "qPES":
+            acq_func = qPredictiveEntropySearch(
+                model=gp, 
+                optimal_inputs=optimal_inputs.to(train_X), 
+            )
+        elif acq_type == "qJES":
+            acq_func = qJointEntropySearch(
+                model=gp,
+                optimal_inputs=optimal_inputs.to(device).to(dtype),
+                optimal_outputs=optimal_outputs.to(device).to(dtype),
+                estimation_type="LB",
+            )
+    elif acq_type == "qMES":
+        acq_func = qLowerBoundMaxValueEntropy(
             model=gp,
-            optimal_inputs=optimal_inputs.to(device).to(dtype),
-            optimal_outputs=optimal_outputs.to(device).to(dtype),
+            candidate_set=torch.rand(1000, dim).to(train_X.dtype).to(train_X.device),
         )
     elif acq_type == "TS":
         acq_func = MaxPosteriorSampling(model=gp, replacement=False)
@@ -191,11 +196,8 @@ def bo_single_iteration(
             "bounds": bounds,
             "q": 1,
             "num_restarts": 10,
-            "raw_samples": 100
+            "raw_samples": 512
         }
-        if acq_type == "qKG":
-            optimize_acqf_kwargs["num_restarts"] = 5
-            optimize_acqf_kwargs["raw_samples"] = 20
         if acq_type == "qPES":
             candidate, _ = optimize_acqf(
                 options={"with_grad": False},
@@ -220,5 +222,13 @@ def bo_full_loop(objective_func, acq_type, X_init, Y_init, bounds, num_iteration
         # Store best observed value
         best_values.append(train_Y.min().item())
         print(f"Iter {iteration_idx} | Current best value: {train_Y.min().item()}")
-    return np.array(best_values)
+    return (
+        np.array(best_values) - objective_func._optimal_value, # simple regret
+        calculate_cumulative_regret(
+            train_Y.detach().cpu().numpy(), 
+            objective_func._optimal_value
+        ), # cumulative regret
+        np.array(train_X.detach().cpu().numpy()), 
+        np.array(train_Y.detach().cpu().numpy()).flatten()
+    )
         
