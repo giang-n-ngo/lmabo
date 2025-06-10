@@ -12,7 +12,7 @@
 #     "SchaffersIllCond" "CompositeGriewankRosenbrock" "Schwefel" "Gallagher21" 
 #     "Gallagher101" "Katsuura" "LunacekBiRastrigin"
 # )
-problems=("Cosine8")
+problems=("Powell")
 method="lmabo"
 
 # Loop over each problem and algorithm

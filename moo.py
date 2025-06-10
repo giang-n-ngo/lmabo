@@ -197,7 +197,6 @@ def mobo_single_iteration(
 
     standard_bounds = torch.zeros(2, train_X.shape[-1], **tkwargs)
     standard_bounds[1] = 1
-    print(f"Standard bounds: {standard_bounds}")
 
     # Define the acquisition function
     sampler = SobolQMCNormalSampler(sample_shape=torch.Size([MC_SAMPLES]))
@@ -224,8 +223,8 @@ def mobo_single_iteration(
             num_fantasies=16,
         )
     elif "ES" in acq_type:
-        num_pareto_samples = 8
-        num_pareto_points = 8
+        num_pareto_samples = 6
+        num_pareto_points = 6
         optimizer_kwargs = {
             "pop_size": 500,
             "max_tries": 10,

@@ -159,7 +159,7 @@ def suggest_acq_type_moo(
             break # Exit retry loop for other errors
     else:
         print(f"Failed to get LLM response for iteration {len(acq_type_list)} after {MAX_RETRIES} retries. Using default AF.")
-        return "qNEHVI", chat, "Failed to get LLM response after retries. Using default AF."
+        return "Intentional Incorrect AF", chat, "Failed to get LLM response after retries"
     return llm_suggested_af, chat, response.text.strip()  # Return the chat object and the response text for logging
 
 
@@ -183,7 +183,7 @@ def get_moo_lengthscales(model_list):
     """
     all_lengthscales = []
     all_outputscales = []
-    for model in model_list:
+    for model in model_list.models:
         lengthscales = model.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
         outputscale = model.covar_module.outputscale.detach().cpu().numpy()
         all_lengthscales.append(lengthscales)
