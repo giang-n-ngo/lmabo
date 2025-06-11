@@ -6,7 +6,7 @@
 #     "DTLZ1" "DTLZ2" "BraninCurrin" 
 #     "Penicillin" "VehicleSafety" "CarSideImpact"
 # )
-problems=("BraninCurrin" )
+problems=("BraninCurrin")
 method="lmamoo"
 
 # Loop over each problem and algorithm

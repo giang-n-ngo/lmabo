@@ -122,11 +122,9 @@ def get_auc(curve):
         return 0.0
     return np.trapezoid(curve, dx=1.0)  # Assuming uniform spacing of 1.0 between points
 
-def get_ranking(problem, result_type):
-    legends = list(acq_type_mapping.keys())
-    legends.append("lmabo")
+def get_ranking(problem, result_type, acq_type_list):
     auc_acq_type = {}
-    for acq_type in legends:
+    for acq_type in acq_type_list:
         acq_type_values = []
         for exp_idx in range(EXP_RUNS):
             try:
@@ -138,7 +136,7 @@ def get_ranking(problem, result_type):
         if len(acq_type_values) > 0:
             auc_acq_type[acq_type] = np.mean(acq_type_values)
         else:
-            auc_acq_type[acq_type] = 1e50 if result_type == "simple_regret" else 0.0
+            auc_acq_type[acq_type] = 1e50 if result_type in ["simple_regret", "cum_regret", "log_hv_diff"] else 0.0
     return get_rank_dict(auc_acq_type, False)
 
 def print_sorted_dict(dictionary, reverse=True, indent=2):
@@ -162,42 +160,35 @@ def print_sorted_dict(dictionary, reverse=True, indent=2):
         print(f"{' ' * indent}{str(key):<{max_key_length}} : {value}")
     print("}")
         
-def report_ranking(problem_list, result_type):
+def report_ranking(problem_list, result_type, reverse=True, acq_type_list=list(acq_type_mapping.keys())):
+    acq_type_list.append("lmabo")
     problem_ranking = {}
     for problem in problem_list:
-        problem_ranking[problem] = get_ranking(problem, result_type)
-    legends = list(acq_type_mapping.keys())
-    legends.append("lmabo")
+        problem_ranking[problem] = get_ranking(problem, result_type, acq_type_list)
     acq_type_ranking = {}
-    for i, acq_type in enumerate(legends):
+    for i, acq_type in enumerate(acq_type_list):
         acq_type_ranking[acq_type] = 0
         for problem in problem_list:
             rank = problem_ranking[problem][acq_type]
             acq_type_ranking[acq_type] = rank + acq_type_ranking[acq_type]
-    print_sorted_dict(acq_type_ranking, reverse=True)
+    print_sorted_dict(acq_type_ranking, reverse=reverse)
     
-def report_completion():
+def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
     """
     Print a table showing number of completed runs for each problem and acquisition type.
     """
     print("Checking number of completed runs for each problem and acquisition type...")
-    problems = []
-    for item in OBJECTIVE_FUNCTIONS:
-        if hasattr(item, "name"):
-            problems.append(item.name)
-        else:
-            problems.append(item.__name__)
     # Add LMABO to acquisition types for complete view
-    all_acq_types = list(acq_type_mapping.keys()) + ["lmabo"]
+    acq_type_list.append("lmabo")
     completed_problems = []
     
     # Calculate padding for pretty printing
     problem_width = max(len(str(p)) for p in problems)
-    acq_width = max(len(str(a)) for a in all_acq_types)
+    acq_width = max(len(str(a)) for a in acq_type_list)
     
     # Print header
     header = f"{'Problem':<{problem_width}}|"
-    header += "".join(f"{acq:^{acq_width}}|" for acq in all_acq_types)
+    header += "".join(f"{acq:^{acq_width}}|" for acq in acq_type_list)
     print("-" * len(header))
     print(header)
     print("-" * len(header))
@@ -207,7 +198,7 @@ def report_completion():
         row = f"{problem:<{problem_width}}|"
         problem_complete = True
         
-        for acq in all_acq_types:
+        for acq in acq_type_list:
             folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
             if acq != "lmabo":
                 if not os.path.exists(folder_path):
@@ -240,7 +231,7 @@ def report_completion():
     print("Completed: ", completed_problems)
     return completed_problems
             
-def report_relative_reg(problem, result_type, verbose=False):
+def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_type_list=list(acq_type_mapping.keys())):
     """
     Analyze relative performance of acquisition functions for a given problem.
     Returns a sorted dictionary of relative cumulative regrets compared to the best performer.
@@ -251,9 +242,10 @@ def report_relative_reg(problem, result_type, verbose=False):
     """
     # Dictionary to store mean cumulative regret for each acquisition type
     mean_auc_regrets = {}
+    acq_type_list.append("lmabo")
     
     # Process results for each acquisition type
-    for acq_type in list(acq_type_mapping.keys()) + ["lmabo"]:
+    for acq_type in acq_type_list:
         acq_type_values = []
         
         # Load all runs for this acquisition type
@@ -270,10 +262,15 @@ def report_relative_reg(problem, result_type, verbose=False):
             # Calculate mean cumulative regret across all runs
             mean_auc_regrets[acq_type] = np.mean(np.stack(acq_type_values), axis=0)
     
-    # Find the best performing method (lowest cumulative regret)
-    best_method = min(mean_auc_regrets.items(), key=lambda x: x[1])
-    best_method_name = best_method[0]
-    best_method_regret = best_method[1]
+    # Find the best performing method
+    if reverse: # for lower better metrics
+        best_method = min(mean_auc_regrets.items(), key=lambda x: x[1])
+        best_method_name = best_method[0]
+        best_method_regret = best_method[1]
+    else: # for higher better metrics
+        best_method = max(mean_auc_regrets.items(), key=lambda x: x[1])
+        best_method_name = best_method[0]
+        best_method_regret = best_method[1]    
     
     # Calculate relative performance
     relative_performance = {
@@ -288,12 +285,15 @@ def report_relative_reg(problem, result_type, verbose=False):
         # Print results in a nice format
         print(f"\nPerformance Analysis for {problem}")
         print(f"Best method: {best_method_name} (baseline)")
-        print(f"Relative {result_type} AUC (compared to best, lower better):")
+        print(f"Relative {result_type} AUC (compared to best):")
         print("-" * 50)
         print(f"{'Method':<15} | {'Relative Regret':>15} | {'vs. Best':>10}")
         print("-" * 50)
         for method, rel_regret in sorted_performance.items():
-            print(f"{method:<15} | {rel_regret:>15.3f} | {'+':>2}{(rel_regret-1)*100:>7.1f}%")
+            if reverse:
+                print(f"{method:<15} | {rel_regret:>15.3f} | {'+':>2}{(rel_regret-1)*100:>7.1f}%")
+            else:
+                print(f"{method:<15} | {rel_regret:>15.3f} | {'-':>2}{(1-rel_regret)*100:>7.1f}%")
     
     return sorted_performance
 
@@ -336,11 +336,10 @@ def plot_results_best_value(problem_name):
     os.makedirs(f"{FIG_DIR}", exist_ok=True)
     plt.savefig(f"{FIG_DIR}/{problem_name}_bestval.pdf", dpi=300)  # Save plot as PDF
 
-def plot_results(problem_name, result_type):
-    legends = list(acq_type_mapping.keys())
-    legends.append("lmabo")
+def plot_results(problem_name, result_type, acq_type_list=list(acq_type_mapping.keys())):
+    acq_type_list.append("lmabo")
     plt.figure(figsize=(16, 10))
-    for i, acq_type in enumerate(legends):
+    for i, acq_type in enumerate(acq_type_list):
         acq_type_values = []
         for exp_idx in range(EXP_RUNS):
             try:
