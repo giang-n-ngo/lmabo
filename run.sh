@@ -5,7 +5,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --time=12:00:00 
-#SBATCH --mem=4G
+#SBATCH --mem=8G
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au

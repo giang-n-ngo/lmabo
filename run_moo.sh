@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=12:00:00 
+#SBATCH --time=24:00:00 
 #SBATCH --mem=16G
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END

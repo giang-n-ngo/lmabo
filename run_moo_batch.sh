@@ -6,8 +6,8 @@
 #     "DTLZ1" "DTLZ2" "BraninCurrin" 
 #     "Penicillin" "VehicleSafety" "CarSideImpact"
 # )
-problems=("BraninCurrin")
-method="lmamoo"
+problems=("ZDT1" "ZDT2" "ZDT3" "DTLZ1" "BraninCurrin")
+method="moo"
 
 # Loop over each problem and algorithm
 for problem in "${problems[@]}"; do
