@@ -242,6 +242,7 @@ def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_
     """
     # Dictionary to store mean cumulative regret for each acquisition type
     mean_auc_regrets = {}
+    std_auc_regrets = {}
     acq_type_list.append("lmabo")
     
     # Process results for each acquisition type
@@ -261,6 +262,7 @@ def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_
         if len(acq_type_values) > 0:
             # Calculate mean cumulative regret across all runs
             mean_auc_regrets[acq_type] = np.mean(np.stack(acq_type_values), axis=0)
+            std_auc_regrets[acq_type] = np.std(np.stack(acq_type_values), axis=0)
     
     # Find the best performing method
     if reverse: # for lower better metrics
@@ -283,17 +285,17 @@ def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_
     
     if verbose:
         # Print results in a nice format
-        print(f"\nPerformance Analysis for {problem}")
+        print(f"Performance Analysis for {problem}")
         print(f"Best method: {best_method_name} (baseline)")
         print(f"Relative {result_type} AUC (compared to best):")
         print("-" * 50)
-        print(f"{'Method':<15} | {'Relative Regret':>15} | {'vs. Best':>10}")
+        print(f"{'Method':<15} | {'Relative Regret':>33} | {'vs. Best':>10}")
         print("-" * 50)
         for method, rel_regret in sorted_performance.items():
             if reverse:
-                print(f"{method:<15} | {rel_regret:>15.3f} | {'+':>2}{(rel_regret-1)*100:>7.1f}%")
+                print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'+':>2}{(rel_regret-1)*100:>7.1f}%")
             else:
-                print(f"{method:<15} | {rel_regret:>15.3f} | {'-':>2}{(1-rel_regret)*100:>7.1f}%")
+                print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'-':>2}{(1-rel_regret)*100:>7.1f}%")
     
     return sorted_performance
 

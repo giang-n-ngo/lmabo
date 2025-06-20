@@ -122,19 +122,7 @@ def fit_gp(X, Y):
     fit_gpytorch_mll(mll)
     return gp
 
-def bo_single_iteration(
-    train_X,
-    train_Y,
-    acq_type,
-    objective_func,
-    bounds
-):
-    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
-        flip = -1
-    else:
-        flip = 1
-    dim = bounds.size(1)
-    gp = fit_gp(train_X, train_Y*flip)
+def _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip):
     if acq_type == "PI":
         acq_func = ProbabilityOfImprovement(model=gp, best_f=train_Y.min(), maximize=False)
     elif acq_type == "LogPI":
@@ -177,16 +165,18 @@ def bo_single_iteration(
     elif acq_type == "qMES":
         acq_func = qLowerBoundMaxValueEntropy(
             model=gp,
-            candidate_set=torch.rand(1000, dim).to(train_X.dtype).to(train_X.device),
+            candidate_set=torch.rand(1000, bounds.size(1)).to(train_X.dtype).to(train_X.device),
         )
     elif acq_type == "TS":
         acq_func = MaxPosteriorSampling(model=gp, replacement=False)
     else:
         raise ValueError("Invalid acquisition function type")    
-    # Optimize the acquisition function to find the next query point
+    return acq_func
+
+def _optimize_acqf(acq_type, acq_func, bounds):
     if acq_type == "TS":
-        n_candidates = min(5000, max(2000, 200 * dim))
-        sobol = SobolEngine(dim, scramble=True)
+        n_candidates = min(5000, max(2000, 200 * bounds.size(1)))
+        sobol = SobolEngine(bounds.size(1), scramble=True)
         X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(n_candidates).to(dtype=dtype, device=device)
         with torch.no_grad():  # We don't need gradients when using TS
             candidate = acq_func(X_cand, num_samples=1)
@@ -205,6 +195,28 @@ def bo_single_iteration(
             )
         else:
             candidate, _ = optimize_acqf(**optimize_acqf_kwargs)
+    return candidate
+
+def bo_single_iteration(
+    train_X,
+    train_Y,
+    acq_type,
+    objective_func,
+    bounds
+):
+    """
+    Performs a single Bayesian Optimization iteration for a given acquisition function type.
+    This function is primarily used by individual (non-portfolio) BO strategies.
+    For GP-Hedge, a modified version `bo_single_iteration_gph` is used to get nominated points.
+    """
+    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
+        flip = -1
+    else:
+        flip = 1
+    gp = fit_gp(train_X, train_Y*flip)
+    acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
+    # Optimize the acquisition function to find the next query point
+    candidate = _optimize_acqf(acq_type, acq_func, bounds)
     # Evaluate the function at the new point
     new_Y = objective_func(candidate).unsqueeze(-1)
     # Update the dataset
@@ -213,6 +225,9 @@ def bo_single_iteration(
     return train_X, train_Y, gp
 
 def bo_full_loop(objective_func, acq_type, X_init, Y_init, bounds, num_iterations):
+    """
+    Runs the full Bayesian Optimization loop for a single acquisition function.
+    """
     # Generate initial training data
     train_X  = X_init.clone()
     train_Y  = Y_init.clone()
@@ -232,3 +247,120 @@ def bo_full_loop(objective_func, acq_type, X_init, Y_init, bounds, num_iteration
         np.array(train_Y.detach().cpu().numpy()).flatten()
     )
         
+def _get_nominated_point_and_posterior_mean(
+    gp,
+    train_X, # Used for getting current best_f
+    train_Y, # Used for getting current best_f
+    acq_type,
+    bounds,
+):
+    """
+    Helper function to get a nominated point and its posterior mean for a single acquisition function.
+    This is designed to be called by GP-Hedge for each 'arm'.
+    """
+    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
+        flip = -1
+    else:
+        flip = 1
+    acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
+    # Optimize the acquisition function
+    candidate = _optimize_acqf(acq_type, acq_func, bounds)
+
+    # Get the posterior mean at the nominated point
+    with torch.no_grad(): # Ensure no gradient tracking for this
+        posterior = gp.posterior(candidate)
+        posterior_mean = posterior.mean.item()*flip
+    return candidate, posterior_mean
+
+def gp_hedge_full_loop(
+    objective_func,
+    portfolio_acq_types, # List of strings, e.g., ["EI", "UCB", "PI"]
+    X_init,
+    Y_init,
+    bounds,
+    num_iterations,
+    eta=0.5, # Learning rate for Hedge
+):
+    """
+    Implements the GP-Hedge Bayesian Optimization loop.
+    Manages a portfolio of acquisition functions using the Hedge algorithm.
+    """
+    train_X = X_init.clone()
+    train_Y = Y_init.clone()
+
+    N = len(portfolio_acq_types)
+    gains = torch.zeros(N, dtype=dtype, device=device) # Initialize cumulative gains for each arm
+
+    best_values = [train_Y.min().item()] # Simple regret values
+
+    # Track probabilities for analysis
+    acquisition_function_weights_history = []
+    acq_type_list = []
+
+    for iteration_idx in range(num_iterations):
+        # 1. Build or update the Gaussian Process (GP) model on the *current* data
+        # Note: GP-Hedge generally implies minimizing objective, so no Y flipping here directly.
+        # Flipping for specific ACQ functions (like qKG) happens inside _get_nominated_point_and_posterior_mean.
+        gp = fit_gp(train_X, train_Y)
+
+        nominated_points = []
+        rewards_for_gains = [] # Expected GP means at nominated points for Hedge update
+
+        # 2. Nominate points from each acquisition function in the portfolio
+        for i, acq_type in enumerate(portfolio_acq_types):
+            nominated_x_i, posterior_mean_i = _get_nominated_point_and_posterior_mean(
+                gp=gp,
+                train_X=train_X,
+                train_Y=train_Y,
+                acq_type=acq_type,
+                bounds=bounds,
+            )
+            nominated_points.append(nominated_x_i)
+
+            # Reward definition: Expected value of the GP model at nominated point
+            # For minimization, a higher (less negative) value is "better"
+            # In original paper, rewards are mu_t(x_t^i). If objective is minimization,
+            # this needs to be negated or handled such that lower value == higher reward for Hedge.
+            # Assuming objective_func is minimization. If higher mu means better, then use mu directly.
+            # If lower mu means better (minimization), then -mu is the "reward".
+            # The paper defines rewards r_t' = mu_t(x_t') and aims to maximize gains.
+            # Since we are minimizing objective, a smaller mu (more negative) is better.
+            # To maximize gains for Hedge, we should use -mu.
+            rewards_for_gains.append(posterior_mean_i) 
+
+        # 3. Select nominee x_t with probability p_t(j)
+        # Calculate probabilities (weights) using the Hedge formula
+        exp_gains = torch.exp(eta * gains)
+        probabilities = exp_gains / torch.sum(exp_gains)
+        acquisition_function_weights_history.append(probabilities.cpu().numpy())
+
+        # Randomly select one acquisition function's nominee based on these probabilities
+        selected_index = torch.multinomial(probabilities, 1).item()
+        x_t = nominated_points[selected_index]
+        acq_type_list.append(portfolio_acq_types[selected_index])
+
+        # 4. Sample the objective function at the selected point
+        new_Y_val = objective_func(x_t).unsqueeze(-1)
+
+        # 5. Augment the data
+        train_X = torch.cat([train_X, x_t])
+        train_Y = torch.cat([train_Y, new_Y_val], dim=0)
+
+        # 6. Update gains for each acquisition function
+        gains = gains + torch.tensor(rewards_for_gains, dtype=dtype, device=device)
+
+        # Store best observed value
+        best_values.append(train_Y.min().item())
+        print(f"Iter {iteration_idx+1} | Selected Acq: {portfolio_acq_types[selected_index]} | Current best value: {train_Y.min().item()}")
+
+    return (
+        np.array(best_values) - objective_func._optimal_value, # simple regret
+        calculate_cumulative_regret(
+            train_Y.detach().cpu().numpy(),
+            objective_func._optimal_value
+        ), # cumulative regret
+        np.array(train_X.detach().cpu().numpy()),
+        np.array(train_Y.detach().cpu().numpy()).flatten(),
+        np.array(acquisition_function_weights_history), # Return weights history
+        acq_type_list
+    )

@@ -6,7 +6,7 @@
 #     "DTLZ1" "DTLZ2" "BraninCurrin" 
 #     "Penicillin" "VehicleSafety" "CarSideImpact"
 # )
-problems=("ZDT1" "ZDT2" "ZDT3" "DTLZ1" "BraninCurrin")
+problems=("DTLZ1" "DTLZ2" "Penicillin" "CarSideImpact")
 method="moo"
 
 # Loop over each problem and algorithm
