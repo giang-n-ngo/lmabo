@@ -178,8 +178,13 @@ def _optimize_acqf(acq_type, acq_func, bounds):
         n_candidates = min(5000, max(2000, 200 * bounds.size(1)))
         sobol = SobolEngine(bounds.size(1), scramble=True)
         X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(n_candidates).to(dtype=dtype, device=device)
-        with torch.no_grad():  # We don't need gradients when using TS
-            candidate = acq_func(X_cand, num_samples=1)
+        candidate = acq_func(X_cand, num_samples=1)
+    elif acq_type == "qPES":
+        n_candidates = min(1000, max(1000, 200 * bounds.size(1)))
+        sobol = SobolEngine(bounds.size(1), scramble=True)
+        X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(n_candidates).to(dtype=dtype, device=device)
+        acq_val = acq_func(X_cand)
+        candidate = X_cand[torch.argmax(acq_val)].unsqueeze(0)
     else:
         optimize_acqf_kwargs = {
             "acq_function": acq_func,
@@ -248,7 +253,6 @@ def bo_full_loop(objective_func, acq_type, X_init, Y_init, bounds, num_iteration
     )
         
 def _get_nominated_point_and_posterior_mean(
-    gp,
     train_X, # Used for getting current best_f
     train_Y, # Used for getting current best_f
     acq_type,
@@ -262,14 +266,14 @@ def _get_nominated_point_and_posterior_mean(
         flip = -1
     else:
         flip = 1
+    gp = fit_gp(train_X, train_Y*flip)
     acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
     # Optimize the acquisition function
     candidate = _optimize_acqf(acq_type, acq_func, bounds)
 
     # Get the posterior mean at the nominated point
-    with torch.no_grad(): # Ensure no gradient tracking for this
-        posterior = gp.posterior(candidate)
-        posterior_mean = posterior.mean.item()*flip
+    posterior = gp.posterior(candidate)
+    posterior_mean = posterior.mean.item()*flip
     return candidate, posterior_mean
 
 def gp_hedge_full_loop(
@@ -279,7 +283,6 @@ def gp_hedge_full_loop(
     Y_init,
     bounds,
     num_iterations,
-    eta=0.5, # Learning rate for Hedge
 ):
     """
     Implements the GP-Hedge Bayesian Optimization loop.
@@ -287,6 +290,7 @@ def gp_hedge_full_loop(
     """
     train_X = X_init.clone()
     train_Y = Y_init.clone()
+    eta = 10**(-2 - int(math.floor(math.log10(torch.abs(train_Y).max().cpu().item()))))
 
     N = len(portfolio_acq_types)
     gains = torch.zeros(N, dtype=dtype, device=device) # Initialize cumulative gains for each arm
@@ -301,36 +305,23 @@ def gp_hedge_full_loop(
         # 1. Build or update the Gaussian Process (GP) model on the *current* data
         # Note: GP-Hedge generally implies minimizing objective, so no Y flipping here directly.
         # Flipping for specific ACQ functions (like qKG) happens inside _get_nominated_point_and_posterior_mean.
-        gp = fit_gp(train_X, train_Y)
-
         nominated_points = []
         rewards_for_gains = [] # Expected GP means at nominated points for Hedge update
 
         # 2. Nominate points from each acquisition function in the portfolio
         for i, acq_type in enumerate(portfolio_acq_types):
             nominated_x_i, posterior_mean_i = _get_nominated_point_and_posterior_mean(
-                gp=gp,
                 train_X=train_X,
                 train_Y=train_Y,
                 acq_type=acq_type,
                 bounds=bounds,
             )
             nominated_points.append(nominated_x_i)
-
-            # Reward definition: Expected value of the GP model at nominated point
-            # For minimization, a higher (less negative) value is "better"
-            # In original paper, rewards are mu_t(x_t^i). If objective is minimization,
-            # this needs to be negated or handled such that lower value == higher reward for Hedge.
-            # Assuming objective_func is minimization. If higher mu means better, then use mu directly.
-            # If lower mu means better (minimization), then -mu is the "reward".
-            # The paper defines rewards r_t' = mu_t(x_t') and aims to maximize gains.
-            # Since we are minimizing objective, a smaller mu (more negative) is better.
-            # To maximize gains for Hedge, we should use -mu.
             rewards_for_gains.append(posterior_mean_i) 
 
         # 3. Select nominee x_t with probability p_t(j)
         # Calculate probabilities (weights) using the Hedge formula
-        exp_gains = torch.exp(eta * gains)
+        exp_gains = torch.exp(torch.abs(eta * gains))
         probabilities = exp_gains / torch.sum(exp_gains)
         acquisition_function_weights_history.append(probabilities.cpu().numpy())
 
@@ -347,7 +338,7 @@ def gp_hedge_full_loop(
         train_Y = torch.cat([train_Y, new_Y_val], dim=0)
 
         # 6. Update gains for each acquisition function
-        gains = gains + torch.tensor(rewards_for_gains, dtype=dtype, device=device)
+        gains = gains - torch.tensor(rewards_for_gains, dtype=dtype, device=device)
 
         # Store best observed value
         best_values.append(train_Y.min().item())

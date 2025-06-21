@@ -165,13 +165,19 @@ def report_ranking(problem_list, result_type, reverse=True, acq_type_list=list(a
     problem_ranking = {}
     for problem in problem_list:
         problem_ranking[problem] = get_ranking(problem, result_type, acq_type_list)
-    acq_type_ranking = {}
+    acq_type_ranking_mean = {}
+    acq_type_ranking_std = {}
     for i, acq_type in enumerate(acq_type_list):
-        acq_type_ranking[acq_type] = 0
+        acq_type_ranking_list = []
         for problem in problem_list:
             rank = problem_ranking[problem][acq_type]
-            acq_type_ranking[acq_type] = rank + acq_type_ranking[acq_type]
-    print_sorted_dict(acq_type_ranking, reverse=reverse)
+            acq_type_ranking_list.append(rank)
+        acq_type_ranking_mean[acq_type] = np.mean(acq_type_ranking_list)
+        acq_type_ranking_std[acq_type] = np.std(acq_type_ranking_list)
+    print("Mean ranking")
+    print_sorted_dict(acq_type_ranking_mean, reverse=reverse)
+    print("Std ranking")
+    print_sorted_dict(acq_type_ranking_std, reverse=reverse)
     
 def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
     """
@@ -180,6 +186,7 @@ def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
     print("Checking number of completed runs for each problem and acquisition type...")
     # Add LMABO to acquisition types for complete view
     acq_type_list.append("lmabo")
+    acq_type_list.append("gphedge")
     completed_problems = []
     
     # Calculate padding for pretty printing
@@ -200,24 +207,32 @@ def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
         
         for acq in acq_type_list:
             folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
-            if acq != "lmabo":
-                if not os.path.exists(folder_path):
-                    count = 0
-                else:
-                    count = len([f for f in os.listdir(folder_path) 
-                            if f.endswith('.npy') and not f.endswith('_acq_types.npy')])
-                count = int(count//4)
-                row += f"{count:^{acq_width}}|"
-                # Check if this acquisition type has all runs
-                if count < EXP_RUNS:
-                    problem_complete = False
-            else:
+            if acq == "lmabo":
                 if not os.path.exists(folder_path):
                     count = 0
                 else:
                     count = len([f for f in os.listdir(folder_path) 
                             if f.endswith('.npy') or f.endswith('.txt')])
                 count = int(count//6)
+                row += f"{count:^{acq_width}}|"
+                # Check if this acquisition type has all runs
+                if count < EXP_RUNS:
+                    problem_complete = False
+            elif acq == "gphedge":
+                if not os.path.exists(folder_path):
+                    count = 0
+                else:
+                    count = len([f for f in os.listdir(folder_path) 
+                            if f.endswith('.npy') or f.endswith('.txt')])
+                count = int(count//6)
+                row += f"{count:^{acq_width}}|"                
+            else:
+                if not os.path.exists(folder_path):
+                    count = 0
+                else:
+                    count = len([f for f in os.listdir(folder_path) 
+                            if f.endswith('.npy') and not f.endswith('_acq_types.npy')])
+                count = int(count//4)
                 row += f"{count:^{acq_width}}|"
                 # Check if this acquisition type has all runs
                 if count < EXP_RUNS:
