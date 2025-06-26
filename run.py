@@ -6,7 +6,6 @@ from bo import (
 )
 from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR
 from lmabo import lm_assisted_adaptive_bo
-from utils import plot_results_best_value
 
 import argparse
 from botorch.test_functions import *
@@ -35,7 +34,7 @@ def save_results(folder_path, exp_idx, simple_regret, cum_regret, train_X, train
     np.save(f"{folder_path}/{exp_idx}_train_X.npy", train_X)
     np.save(f"{folder_path}/{exp_idx}_train_Y.npy", train_Y)
 
-def run_problem(problem, acq_type=None):
+def run_problem(problem, acq_type=None, starting_exp_idx=0):
     print(f"Running {acq_type}")
     # prepare function
     objective_func, dim, bounds = prepare_objective_func(problem)
@@ -46,7 +45,7 @@ def run_problem(problem, acq_type=None):
     num_iterations = 50 if dim <= 10 else 100
     folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
     os.makedirs(folder_path, exist_ok=True)
-    for exp_idx in range(EXP_RUNS):
+    for exp_idx in range(starting_exp_idx, EXP_RUNS):
         print(f"RUN {exp_idx}")
         if os.path.exists(f"{folder_path}/{exp_idx}_train_X.npy"):
             print("Completed!")
@@ -130,17 +129,17 @@ if __name__=="__main__":
         help="Whether to run BO or LMABO",
     )
     argparser.add_argument(
-        "--plot_flag",
-        action="store_true",
-        help="Plot the results after running the optimization"
+        "--starting_exp_idx",
+        type=int,
+        default=-1,
+        help="Which experiment to run",        
     )
     args = argparser.parse_args()
+    starting_exp_idx = max(0, args.starting_exp_idx)
     if args.method == "bo":
         for acq_type in acq_type_mapping.keys():
-            run_problem(args.problem, acq_type)
+            run_problem(args.problem, acq_type, starting_exp_idx)
     elif args.method == "lmabo":
-        run_problem(args.problem, "lmabo")
+        run_problem(args.problem, "lmabo", starting_exp_idx)
     elif args.method == "gphedge":
-        run_problem(args.problem, "gphedge")    
-    if args.plot_flag:
-        plot_results_best_value(args.problem)
+        run_problem(args.problem, "gphedge", starting_exp_idx)    

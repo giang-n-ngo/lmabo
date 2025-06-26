@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 import sys
 
 from utils import (
@@ -26,6 +27,16 @@ if args.setting == "bo":
     from bo import acq_type_mapping
     from constants import OBJECTIVE_FUNCTIONS
 
+    active_acq_type_list = list(acq_type_mapping.keys())
+    active_acq_type_list += [
+        "lmabo",
+        "gphedge",
+    ]
+    excepted_acq_type_list = [
+        "llmgp"
+    ]
+    full_acq_type_list = active_acq_type_list + excepted_acq_type_list
+
     # Redirect output to file
     problems = []
     for item in OBJECTIVE_FUNCTIONS:
@@ -34,22 +45,27 @@ if args.setting == "bo":
         else:
             problems.append(item.__name__)
 
-    completed_problems = report_completion(problems)
+    completed_problems = report_completion(problems, active_acq_type_list, excepted_acq_type_list)
     print(f"Completed {len(completed_problems)} problems out of {len(problems)}")
     print("Total simple regret ranking (lower better):")
-    report_ranking(completed_problems, "simple_regret")
-    all_relative_simple_reg = {acq_type: 0 for acq_type in list(acq_type_mapping.keys())+['lmabo']}
+    report_ranking(completed_problems, "simple_regret", True, active_acq_type_list)
+    all_relative_simple_reg = {acq_type: [] for acq_type in active_acq_type_list}
     for problem in completed_problems:
-        relative_simple_reg = report_relative_reg(problem, "simple_regret", True, True)
+        relative_simple_reg = report_relative_reg(problem, "simple_regret", True, True, active_acq_type_list)
         for acq_type in relative_simple_reg.keys():
-            all_relative_simple_reg[acq_type] = all_relative_simple_reg[acq_type] + relative_simple_reg[acq_type]
+            all_relative_simple_reg[acq_type].append(relative_simple_reg[acq_type])
         print("=="*20)
-    print("Total relative simple regret (lower better):")
-    print_sorted_dict(all_relative_simple_reg, reverse=True)
+    print("Summary relative simple regret (lower better):")
+    mean_relative_simple_reg = {acq_type: np.mean(val) for acq_type, val in all_relative_simple_reg.items()}
+    std_relative_simple_reg = {acq_type: np.std(val) for acq_type, val in all_relative_simple_reg.items()}
+    print("Mean")
+    print_sorted_dict(mean_relative_simple_reg, reverse=True)
+    print("Std")
+    print_sorted_dict(std_relative_simple_reg, reverse=True)
 
     for problem in problems:
-        plot_results(problem, "simple_regret", list(acq_type_mapping.keys()))
-        plot_results_best_value(problem)
+        plot_results(problem, "simple_regret", full_acq_type_list)
+        plot_results_best_value(problem, full_acq_type_list)
 elif args.setting == "moo":
     from moo import MOO_OBJECTIVE_FUNCTIONS, moo_acq_type_mapping
     moo_acq_type_list = list(moo_acq_type_mapping.keys())

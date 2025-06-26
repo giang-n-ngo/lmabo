@@ -1,13 +1,14 @@
 from botorch.test_functions import *
 from test_functions.test_functions import *
-from test_functions.lunar_lander import LunarLander
+
 FIG_DIR = "figures" 
-NUMERICAL_RESULTS_DIR= "numerical_results" 
+NUMERICAL_RESULTS_DIR = "numerical_results" 
 EXP_RUNS  = 10  # Number of runs per acquisition function
+LLMGP_NUMERICAL_RESULTS_DIR = "llm_processes/output/black_box"
 
 # Add COCO test problems
 Sphere = create_coco_class(function_id=1, dimension=5, problem_name="Sphere")  # F1: Sphere
-Ellipsoid = create_coco_class(function_id=2, dimension=10, problem_name="Ellipsoid")  # F2: Separable Ellipsoid
+Ellipsoid = create_coco_class(function_id=2, dimension=5, problem_name="Ellipsoid")  # F2: Separable Ellipsoid
 BucheRastrigin = create_coco_class(function_id=4, dimension=5, problem_name="BucheRastrigin")  # F4: Büche-Rastrigin
 LinearSlope = create_coco_class(function_id=5, dimension=5, problem_name="LinearSlope")  # F5: Linear Slope
 AttractiveSector = create_coco_class(function_id=6, dimension=5, problem_name="AttractiveSector")  # F6: Attractive Sector
@@ -49,7 +50,7 @@ OBJECTIVE_FUNCTIONS = [
     SixHumpCamel,
     StyblinskiTang,
     Sphere, 
-    Ellipsoid, 
+    # Ellipsoid, 
     BucheRastrigin,
     LinearSlope, 
     AttractiveSector, 
@@ -68,7 +69,8 @@ OBJECTIVE_FUNCTIONS = [
     Gallagher21, 
     Gallagher101, 
     Katsuura,
-    LunacekBiRastrigin
+    LunacekBiRastrigin,
+    Easom
 ]
 
 DIMS = {

@@ -4,8 +4,10 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=24:00:00 
-#SBATCH --mem=8G
+#SBATCH --constraint=gpu-v100
+#SBATCH --time=12:00:00 
+#SBATCH --mem=6G
+#SBATCH --cpus-per-gpu=4
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -18,4 +20,4 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 # Run the Python script
-python run.py --problem $problem --method $method --plot_flag
+python run.py --problem $problem --method $method

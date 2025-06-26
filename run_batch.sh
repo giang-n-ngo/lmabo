@@ -10,12 +10,12 @@
 #     "StepEllipsoid" "RosenbrockRotated" "Ellipsoid2" "Discus" "BentCigar" 
 #     "SharpRidge" "DifferentPowers" "Weierstrass" "Schaffers" 
 #     "SchaffersIllCond" "CompositeGriewankRosenbrock" "Schwefel" "Gallagher21" 
-#     "Gallagher101" "Katsuura" "LunacekBiRastrigin"
+#     "Gallagher101" "Katsuura" "LunacekBiRastrigin" "Easom"
 # )
-problems=("Powell")
-method="lmabo"
-# method="bo"
-method="gphedge"
+problems=("Ackley" "DixonPrice" "Griewank" "Powell" "Rosenbrock" "StyblinskiTang" "AttractiveSector" "RosenbrockRotated" "Discus" "DifferentPowers" "SchaffersIllCond" "CompositeGriewankRosenbrock")
+# method="lmabo"
+method="bo"
+# method="gphedge"
 
 # Loop over each problem and algorithm
 for problem in "${problems[@]}"; do

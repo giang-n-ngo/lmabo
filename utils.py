@@ -4,8 +4,13 @@ import numpy as np
 import os
 import torch
 
-from bo import prepare_objective_func, calculate_auc_simple_regret, acq_type_mapping
-from constants import NUMERICAL_RESULTS_DIR, EXP_RUNS, OBJECTIVE_FUNCTIONS, FIG_DIR
+from bo import acq_type_mapping
+from constants import (
+    NUMERICAL_RESULTS_DIR, 
+    EXP_RUNS, 
+    FIG_DIR, 
+    LLMGP_NUMERICAL_RESULTS_DIR
+)
 
 matplotlib_colors = [
     '#1f77b4',  # Muted blue (from default 'tab10' palette)
@@ -128,7 +133,10 @@ def get_ranking(problem, result_type, acq_type_list):
         acq_type_values = []
         for exp_idx in range(EXP_RUNS):
             try:
-                file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
+                if acq_type == "llmgp":
+                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
+                else:
+                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
                 result = np.load(file_name)
                 acq_type_values.append(get_auc(result))
             except:
@@ -161,7 +169,6 @@ def print_sorted_dict(dictionary, reverse=True, indent=2):
     print("}")
         
 def report_ranking(problem_list, result_type, reverse=True, acq_type_list=list(acq_type_mapping.keys())):
-    acq_type_list.append("lmabo")
     problem_ranking = {}
     for problem in problem_list:
         problem_ranking[problem] = get_ranking(problem, result_type, acq_type_list)
@@ -179,23 +186,24 @@ def report_ranking(problem_list, result_type, reverse=True, acq_type_list=list(a
     print("Std ranking")
     print_sorted_dict(acq_type_ranking_std, reverse=reverse)
     
-def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
+def report_completion(
+    problems, 
+    active_acq_type_list=list(acq_type_mapping.keys()), 
+    excepted_acq_type_list=[]
+):
     """
     Print a table showing number of completed runs for each problem and acquisition type.
     """
     print("Checking number of completed runs for each problem and acquisition type...")
-    # Add LMABO to acquisition types for complete view
-    acq_type_list.append("lmabo")
-    acq_type_list.append("gphedge")
     completed_problems = []
     
     # Calculate padding for pretty printing
     problem_width = max(len(str(p)) for p in problems)
-    acq_width = max(len(str(a)) for a in acq_type_list)
+    acq_width = max(len(str(a)) for a in active_acq_type_list + excepted_acq_type_list)
     
     # Print header
     header = f"{'Problem':<{problem_width}}|"
-    header += "".join(f"{acq:^{acq_width}}|" for acq in acq_type_list)
+    header += "".join(f"{acq:^{acq_width}}|" for acq in active_acq_type_list + excepted_acq_type_list)
     print("-" * len(header))
     print(header)
     print("-" * len(header))
@@ -205,9 +213,12 @@ def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
         row = f"{problem:<{problem_width}}|"
         problem_complete = True
         
-        for acq in acq_type_list:
-            folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
-            if acq == "lmabo":
+        for acq in active_acq_type_list + excepted_acq_type_list:
+            if acq == "llmgp":
+                folder_path = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp"
+            else:
+                folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
+            if acq == "lmabo" or acq == "gphedge":
                 if not os.path.exists(folder_path):
                     count = 0
                 else:
@@ -216,16 +227,18 @@ def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
                 count = int(count//6)
                 row += f"{count:^{acq_width}}|"
                 # Check if this acquisition type has all runs
-                if count < EXP_RUNS:
+                if count < EXP_RUNS and acq not in excepted_acq_type_list:
                     problem_complete = False
-            elif acq == "gphedge":
+            elif acq == "llmgp":
                 if not os.path.exists(folder_path):
                     count = 0
                 else:
-                    count = len([f for f in os.listdir(folder_path) 
-                            if f.endswith('.npy') or f.endswith('.txt')])
-                count = int(count//6)
-                row += f"{count:^{acq_width}}|"                
+                    count = len([f for f in os.listdir(folder_path) if f.endswith('.npy')])
+                count = int(count//3)
+                row += f"{count:^{acq_width}}|"     
+                # Check if this acquisition type has all runs
+                if count < EXP_RUNS and acq not in excepted_acq_type_list:
+                    problem_complete = False
             else:
                 if not os.path.exists(folder_path):
                     count = 0
@@ -235,7 +248,7 @@ def report_completion(problems, acq_type_list=list(acq_type_mapping.keys())):
                 count = int(count//4)
                 row += f"{count:^{acq_width}}|"
                 # Check if this acquisition type has all runs
-                if count < EXP_RUNS:
+                if count < EXP_RUNS and acq not in excepted_acq_type_list:
                     problem_complete = False
                 
         print(row)
@@ -258,7 +271,6 @@ def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_
     # Dictionary to store mean cumulative regret for each acquisition type
     mean_auc_regrets = {}
     std_auc_regrets = {}
-    acq_type_list.append("lmabo")
     
     # Process results for each acquisition type
     for acq_type in acq_type_list:
@@ -267,7 +279,10 @@ def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_
         # Load all runs for this acquisition type
         for exp_idx in range(EXP_RUNS):
             try:
-                file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
+                if acq_type == "llmgp":
+                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp/{exp_idx}_{result_type}.npy"
+                else:
+                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
                 simple_regret = np.load(file_name)
                 auc_regret = np.trapezoid(simple_regret, dx=1.0)  # Assuming uniform spacing of 1.0 between points
                 acq_type_values.append(auc_regret)
@@ -314,15 +329,16 @@ def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_
     
     return sorted_performance
 
-def plot_results_best_value(problem_name):
-    legends = list(acq_type_mapping.keys())
-    legends.append("lmabo")
+def plot_results_best_value(problem_name, acq_type_list=list(acq_type_mapping.keys())):
     plt.figure(figsize=(16, 10))
-    for i, acq_type in enumerate(legends):
+    for i, acq_type in enumerate(acq_type_list):
         acq_type_values = []
         for exp_idx in range(EXP_RUNS):
             try:
-                file_name = f"{NUMERICAL_RESULTS_DIR}/{problem_name}/{acq_type}/{exp_idx}_train_Y.npy"
+                if acq_type == "llmgp":
+                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem_name}/llmgp/{problem_name}/{acq_type}/{exp_idx}_train_Y.npy"
+                else:
+                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem_name}/{acq_type}/{exp_idx}_train_Y.npy"
                 train_Y = np.load(file_name)
                 acq_type_values.append(np.minimum.accumulate(train_Y))
             except:
@@ -354,13 +370,15 @@ def plot_results_best_value(problem_name):
     plt.savefig(f"{FIG_DIR}/{problem_name}_bestval.pdf", dpi=300)  # Save plot as PDF
 
 def plot_results(problem_name, result_type, acq_type_list=list(acq_type_mapping.keys())):
-    acq_type_list.append("lmabo")
     plt.figure(figsize=(16, 10))
     for i, acq_type in enumerate(acq_type_list):
         acq_type_values = []
         for exp_idx in range(EXP_RUNS):
             try:
-                file_name = f"{NUMERICAL_RESULTS_DIR}/{problem_name}/{acq_type}/{exp_idx}_{result_type}.npy"
+                if acq_type == "llmgp":
+                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem_name}/llmgp/{problem_name}/{acq_type}/{exp_idx}_{result_type}.npy"
+                else:
+                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem_name}/{acq_type}/{exp_idx}_{result_type}.npy"
                 best_values = np.load(file_name)
                 acq_type_values.append(best_values)
             except:

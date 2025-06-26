@@ -147,7 +147,7 @@ def _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip):
         optimal_inputs, optimal_outputs = get_optimal_samples(
             model=gp_cpu, 
             bounds=bounds.cpu(), 
-            num_optima=12
+            num_optima=4
         )
         del gp_cpu  # Free memory
         if acq_type == "qPES":
@@ -290,7 +290,7 @@ def gp_hedge_full_loop(
     """
     train_X = X_init.clone()
     train_Y = Y_init.clone()
-    eta = 10**(-2 - int(math.floor(math.log10(torch.abs(train_Y).max().cpu().item()))))
+    eta = 10**(-2 - max(int(math.floor(math.log10(torch.abs(train_Y).max().cpu().item()))), 0))
 
     N = len(portfolio_acq_types)
     gains = torch.zeros(N, dtype=dtype, device=device) # Initialize cumulative gains for each arm
