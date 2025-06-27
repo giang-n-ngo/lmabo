@@ -123,29 +123,49 @@ def get_auc(curve):
     Returns:
         float: The AUC value.
     """
-    if len(curve) < 2:
-        return 0.0
-    return np.trapezoid(curve, dx=1.0)  # Assuming uniform spacing of 1.0 between points
+    assert len(curve.shape)==1, "Wrong result shape"
+    assert curve.shape[0] > 2, "Not enough elements to get AUC"
+    return np.trapezoid(curve.squeeze(), dx=1.0).item()  # Assuming uniform spacing of 1.0 between points
 
-def get_ranking(problem, result_type, acq_type_list):
+def read_raw_result(problem, acq_type, result_type):
+    raw_result = []
+    for exp_idx in range(EXP_RUNS):
+        try:
+            if acq_type == "llmgp":
+                file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp/{exp_idx}_{result_type}.npy"
+            else:
+                file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
+            simple_regret = np.load(file_name)
+            raw_result.append(simple_regret)
+        except FileNotFoundError:
+            continue 
+    return raw_result
+
+def get_result_auc(problem, acq_type, result_type):
+    raw_result = read_raw_result(problem, acq_type, result_type)
+    result_auc = [get_auc(result) for result in raw_result]
+    return result_auc
+
+def get_problem_result(problem_list, acq_type_list, result_type):
+    problem_result = {}
+    for problem in problem_list:
+        problem_result[problem] = {}
+        for acq_type in acq_type_list:
+            problem_result[problem][acq_type] = get_result_auc(problem, acq_type, result_type)
+    return problem_result
+
+def get_ranking(result, result_type):
     auc_acq_type = {}
-    for acq_type in acq_type_list:
-        acq_type_values = []
-        for exp_idx in range(EXP_RUNS):
-            try:
-                if acq_type == "llmgp":
-                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
-                else:
-                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
-                result = np.load(file_name)
-                acq_type_values.append(get_auc(result))
-            except:
-                pass
+    for acq_type in result.keys():
+        acq_type_values = result[acq_type]
         if len(acq_type_values) > 0:
-            auc_acq_type[acq_type] = np.mean(acq_type_values)
+            auc_acq_type[acq_type] = np.mean(acq_type_values).item()
         else:
             auc_acq_type[acq_type] = 1e50 if result_type in ["simple_regret", "cum_regret", "log_hv_diff"] else 0.0
-    return get_rank_dict(auc_acq_type, False)
+    if result_type in ["simple_regret", "cum_regret", "log_hv_diff"]:
+        return get_rank_dict(auc_acq_type, False)
+    else:
+        return get_rank_dict(auc_acq_type, True)
 
 def print_sorted_dict(dictionary, reverse=True, indent=2):
     """
@@ -167,20 +187,79 @@ def print_sorted_dict(dictionary, reverse=True, indent=2):
         # Format each line with proper indentation and alignment
         print(f"{' ' * indent}{str(key):<{max_key_length}} : {value}")
     print("}")
-        
-def report_ranking(problem_list, result_type, reverse=True, acq_type_list=list(acq_type_mapping.keys())):
+            
+def report_relative_reg(
+    problem, 
+    result_type, 
+    auc_acq_type_dict, 
+    verbose=False, 
+    reverse=False, 
+):
+    """
+    Analyze relative performance of acquisition functions for a given problem.
+    Returns a sorted dictionary of relative cumulative regrets compared to the best performer.
+    
+    Args:
+        problem_name: Name of the test problem
+        true_minimum: True minimum value of the objective function
+    """
+    # Dictionary to store mean cumulative regret for each acquisition type
+    mean_auc_regrets = {}
+    std_auc_regrets = {}
+    
+    # Process results for each acquisition type
+    for acq_type in auc_acq_type_dict.keys():
+        acq_type_values = np.stack(auc_acq_type_dict[acq_type])
+        if len(acq_type_values) > 0:
+            mean_auc_regrets[acq_type] = np.mean(acq_type_values, axis=0)
+            std_auc_regrets[acq_type] = np.std(acq_type_values, axis=0)
+    
+    # Find the best performing method
+    if reverse: # for lower better metrics
+        best_method = min(mean_auc_regrets.items(), key=lambda x: x[1])
+    else: # for higher better metrics
+        best_method = max(mean_auc_regrets.items(), key=lambda x: x[1])
+    best_method_name = best_method[0]
+    best_method_regret = best_method[1]    
+    
+    # Calculate relative performance
+    relative_performance = {
+        acq_type: regret / best_method_regret 
+        for acq_type, regret in mean_auc_regrets.items()
+    }
+    
+    # Sort by performance (ascending)
+    sorted_performance = dict(sorted(relative_performance.items(), key=lambda x: x[1]))
+    
+    if verbose:
+        # Print results in a nice format
+        print(f"Performance Analysis for {problem}")
+        print(f"Best method: {best_method_name} (baseline)")
+        print(f"Relative {result_type} AUC (compared to best):")
+        print("-" * 50)
+        print(f"{'Method':<15} | {'Relative Regret':>33} | {'vs. Best':>10}")
+        print("-" * 50)
+        for method, rel_regret in sorted_performance.items():
+            if reverse:
+                print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'+':>2}{(rel_regret-1)*100:>7.1f}%")
+            else:
+                print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'-':>2}{(1-rel_regret)*100:>7.1f}%")
+    return sorted_performance
+
+def report_ranking_summary(problem_result, result_type, acq_type_list=list(acq_type_mapping.keys())):
     problem_ranking = {}
-    for problem in problem_list:
-        problem_ranking[problem] = get_ranking(problem, result_type, acq_type_list)
+    for problem in problem_result.keys():
+        problem_ranking[problem] = get_ranking(problem_result[problem], result_type)
     acq_type_ranking_mean = {}
     acq_type_ranking_std = {}
-    for i, acq_type in enumerate(acq_type_list):
+    for acq_type in acq_type_list:
         acq_type_ranking_list = []
-        for problem in problem_list:
+        for problem in problem_result.keys():
             rank = problem_ranking[problem][acq_type]
             acq_type_ranking_list.append(rank)
         acq_type_ranking_mean[acq_type] = np.mean(acq_type_ranking_list)
         acq_type_ranking_std[acq_type] = np.std(acq_type_ranking_list)
+    reverse = False if result_type in ["simple_regret", "cum_regret", "log_hv_diff"] else True
     print("Mean ranking")
     print_sorted_dict(acq_type_ranking_mean, reverse=reverse)
     print("Std ranking")
@@ -258,131 +337,20 @@ def report_completion(
     print("-" * len(header))
     print("Completed: ", completed_problems)
     return completed_problems
-            
-def report_relative_reg(problem, result_type, verbose=False, reverse=False, acq_type_list=list(acq_type_mapping.keys())):
-    """
-    Analyze relative performance of acquisition functions for a given problem.
-    Returns a sorted dictionary of relative cumulative regrets compared to the best performer.
-    
-    Args:
-        problem_name: Name of the test problem
-        true_minimum: True minimum value of the objective function
-    """
-    # Dictionary to store mean cumulative regret for each acquisition type
-    mean_auc_regrets = {}
-    std_auc_regrets = {}
-    
-    # Process results for each acquisition type
-    for acq_type in acq_type_list:
-        acq_type_values = []
-        
-        # Load all runs for this acquisition type
-        for exp_idx in range(EXP_RUNS):
-            try:
-                if acq_type == "llmgp":
-                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp/{exp_idx}_{result_type}.npy"
-                else:
-                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
-                simple_regret = np.load(file_name)
-                auc_regret = np.trapezoid(simple_regret, dx=1.0)  # Assuming uniform spacing of 1.0 between points
-                acq_type_values.append(auc_regret)
-            except:
-                continue
-                
-        if len(acq_type_values) > 0:
-            # Calculate mean cumulative regret across all runs
-            mean_auc_regrets[acq_type] = np.mean(np.stack(acq_type_values), axis=0)
-            std_auc_regrets[acq_type] = np.std(np.stack(acq_type_values), axis=0)
-    
-    # Find the best performing method
-    if reverse: # for lower better metrics
-        best_method = min(mean_auc_regrets.items(), key=lambda x: x[1])
-        best_method_name = best_method[0]
-        best_method_regret = best_method[1]
-    else: # for higher better metrics
-        best_method = max(mean_auc_regrets.items(), key=lambda x: x[1])
-        best_method_name = best_method[0]
-        best_method_regret = best_method[1]    
-    
-    # Calculate relative performance
-    relative_performance = {
-        acq_type: regret / best_method_regret 
-        for acq_type, regret in mean_auc_regrets.items()
-    }
-    
-    # Sort by performance (ascending)
-    sorted_performance = dict(sorted(relative_performance.items(), key=lambda x: x[1]))
-    
-    if verbose:
-        # Print results in a nice format
-        print(f"Performance Analysis for {problem}")
-        print(f"Best method: {best_method_name} (baseline)")
-        print(f"Relative {result_type} AUC (compared to best):")
-        print("-" * 50)
-        print(f"{'Method':<15} | {'Relative Regret':>33} | {'vs. Best':>10}")
-        print("-" * 50)
-        for method, rel_regret in sorted_performance.items():
-            if reverse:
-                print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'+':>2}{(rel_regret-1)*100:>7.1f}%")
-            else:
-                print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'-':>2}{(1-rel_regret)*100:>7.1f}%")
-    
-    return sorted_performance
-
-def plot_results_best_value(problem_name, acq_type_list=list(acq_type_mapping.keys())):
-    plt.figure(figsize=(16, 10))
-    for i, acq_type in enumerate(acq_type_list):
-        acq_type_values = []
-        for exp_idx in range(EXP_RUNS):
-            try:
-                if acq_type == "llmgp":
-                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem_name}/llmgp/{problem_name}/{acq_type}/{exp_idx}_train_Y.npy"
-                else:
-                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem_name}/{acq_type}/{exp_idx}_train_Y.npy"
-                train_Y = np.load(file_name)
-                acq_type_values.append(np.minimum.accumulate(train_Y))
-            except:
-                pass
-        if len(acq_type_values) > 0:
-            acq_type_values = np.stack(acq_type_values)
-            mean_acq_type_values = acq_type_values.mean(axis=0)
-            std_acq_type_values = acq_type_values.std(axis=0)
-            n_iter = np.arange(1, mean_acq_type_values.shape[0]+1)
-            plt.plot(
-                n_iter, 
-                mean_acq_type_values, 
-                color=matplotlib_colors[i],
-                label=acq_type
-            )
-            plt.fill_between(
-                n_iter, 
-                mean_acq_type_values - 0.5*std_acq_type_values, 
-                mean_acq_type_values + 0.5*std_acq_type_values, 
-                color=matplotlib_colors[i],
-                alpha=0.2
-            )
-    plt.xlabel("Iteration")
-    plt.ylabel("Best Function Value Found")
-    plt.title(f"{problem_name}")
-    plt.legend()
-    plt.grid(True)
-    os.makedirs(f"{FIG_DIR}", exist_ok=True)
-    plt.savefig(f"{FIG_DIR}/{problem_name}_bestval.pdf", dpi=300)  # Save plot as PDF
 
 def plot_results(problem_name, result_type, acq_type_list=list(acq_type_mapping.keys())):
     plt.figure(figsize=(16, 10))
     for i, acq_type in enumerate(acq_type_list):
-        acq_type_values = []
-        for exp_idx in range(EXP_RUNS):
-            try:
-                if acq_type == "llmgp":
-                    file_name = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem_name}/llmgp/{problem_name}/{acq_type}/{exp_idx}_{result_type}.npy"
-                else:
-                    file_name = f"{NUMERICAL_RESULTS_DIR}/{problem_name}/{acq_type}/{exp_idx}_{result_type}.npy"
-                best_values = np.load(file_name)
-                acq_type_values.append(best_values)
-            except:
-                pass
+        if result_type == "best_val":
+            raw_result = read_raw_result(problem_name, acq_type, "train_Y")
+            if raw_result[0].shape[0] > 100:
+                raw_result = [result[-51:] for result in raw_result]
+            else:
+                raw_result = [result[-101:] for result in raw_result]
+            acq_type_values = [np.minimum.accumulate(result) for result in raw_result]
+        else:
+            raw_result = read_raw_result(problem_name, acq_type, result_type)
+            acq_type_values = raw_result
         if len(acq_type_values) > 0:
             acq_type_values = np.stack(acq_type_values)
             mean_acq_type_values = acq_type_values.mean(axis=0)
