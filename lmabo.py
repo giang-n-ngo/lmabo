@@ -1,19 +1,8 @@
-import google.generativeai as genai
 import numpy as np
-import time
-import random
-import re
 
-from google.api_core.exceptions import ResourceExhausted
-
-from bo import *
-from key import API_KEYS
+from bo import bo_single_iteration, fit_gp, calculate_cumulative_regret
+from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
-
-
-MAX_RETRIES = 10
-MAX_DELAY_SECONDS = 120
-INITIAL_DELAY_SECONDS = 1
 
 INITIAL_PROMPT_CONTENT = """
 You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. 
@@ -68,290 +57,91 @@ FINAL_GUESS = """
 Now that you have finished the optimization process, can you guess which function is this?
 """
 
-def test_api_key(key):
-    """
-    Test if a Gemini API key is valid by attempting a simple chat interaction.
-    
-    Args:
-        key (str): API key to test
-        
-    Returns:
-        bool: True if key is valid, False if it raises any errors
-    """
-    try:
-        genai.configure(api_key=key)
-        model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20')
-        chat = model.start_chat()
-        response = chat.send_message("Test message")
-        return True
-    except Exception as e:
-        print(f"Key failed: {str(e)}")
-        return False
-
-def get_valid_key():
-    """
-    Test all API keys and return only the valid ones.
-    
-    Returns:
-        list: List of valid API keys
-    """
-    shuffled_keys = API_KEYS.copy()  # Create a copy to avoid modifying original
-    random.shuffle(shuffled_keys)
-    valid_key = None
-    for key in shuffled_keys:
-        if test_api_key(key):
-            valid_key = key
-            break
-    if valid_key is None:
-        print("No valid API keys found. Please check your keys and network connection.")
-        exit()
-    else:
-        print(f"Using valid key: {valid_key[:8]}...")
-        return valid_key
-    
-def configure_and_start_chat_api():
-    import google.generativeai as genai
-    from google.api_core.exceptions import ResourceExhausted
-    from key import API_KEYS
-    valid_key = get_valid_key()
-    genai.configure(api_key=valid_key)
-    # init LLM
-    model = genai.GenerativeModel(
-        'gemini-2.5-flash-preview-05-20', 
-    )
-    # --- START THE CHAT SESSION ---
-    print("Starting Gemini chat session with initial context...")
-    try:
-        chat = model.start_chat(history=[
-            {"role": "user", "parts": [INITIAL_PROMPT_CONTENT]}
-        ])
-        # The first response from the model just confirms it understands the context
-        # You might want to print/log this response, or just ignore it
-        initial_response = chat.send_message("Do you understand the context?")
-        print(f"Gemini's initial acknowledgement: {initial_response.text.strip()}")
-        return chat, initial_response.text.strip()
-    except Exception as e:
-        print(f"Error starting chat or initial acknowledgement: {e}")
-        print("Please check your API key, model availability, and network connection.")
-        exit() # Exit if we can't even start the chat    
-
-class ChatHistory:
-    def __init__(self):
-        self.turns = []
-
-    def add_turn(self, user, assistant):
-        self.turns.append({"user": user, "assistant": assistant})
-
-    def format_prompt(self, new_user_input=None):
-        prompt = ""
-        for turn in self.turns:
-            prompt += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
-        if new_user_input is not None:
-            prompt += f"User: {new_user_input}\nAssistant:"
-        return prompt
-    
-def model_answer(model, tokenizer, prompt):
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    outputs = model.generate(**inputs, max_new_tokens=256, do_sample=True, temperature=0.7)
-    response = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)    
-    return response
-
-def configure_and_start_chat_ops():
-    from transformers import AutoModelForCausalLM, AutoTokenizer
-    # Load Qwen3 model and tokenizer from Hugging Face Hub
-    model_name = "Qwen/Qwen3-8B"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16, device_map="auto")
-    print("Initialized Qwen3")
-    # Start a conversation
-    history = ChatHistory()
-    prompt = history.format_prompt(INITIAL_PROMPT_CONTENT)
-    response = model_answer(model, tokenizer, prompt)
-    print("Assistant:", response.strip())
-    history.add_turn(INITIAL_PROMPT_CONTENT, response.strip())
-    return model, tokenizer, history
-
-def suggest_acq_type(chat, train_X, train_Y, acq_type_list, bounds, lengthscales, outputscale, remaining_iterations, llm="api"):
-    # --- NEW: Calculate shortest distance of the last point relative to bounds ---
-    shortest_dist = get_shortest_distance_from_last_point(train_X, bounds)
-    if lengthscales is not None:
-        # --- Calculate descriptive statistics ---
-        min_ls = np.min(lengthscales)
-        max_ls = np.max(lengthscales)
-        mean_ls = np.mean(lengthscales)
-        std_ls = np.std(lengthscales)
-
-    prompt = FOLLOW_UP_PROMPT_TEMPLATE.format(
-        N=train_Y.shape[0],
-        remaining=remaining_iterations,
-        D=train_X.shape[1],
-        f_min=torch.round(train_Y.min().detach().cpu(), decimals=3).item(),
-        # last_y_values=train_Y[-5:].detach().cpu().squeeze(-1).tolist(),
-        # acquisition_history=acq_type_list,
-        shortest_dist=shortest_dist,
-        min_ls=min_ls,
-        max_ls=max_ls,
-        mean_ls=mean_ls,
-        std_ls=std_ls,
-        # ls_variation_description=ls_variation_description,
-        # general_ls_scale_description=general_ls_scale_description,
-        outputscale=outputscale
-    )
-    print(f"Iter {len(acq_type_list)}|", prompt)
-    retries = 0
-    current_delay = INITIAL_DELAY_SECONDS
-    
-    llm_suggested_af = "UCB"
-    while retries < MAX_RETRIES:
-        try:
-            # Send the updated summary to the active chat
-            response = chat.send_message(prompt)
-
-            if response.text:
-                llm_suggested_af_raw = response.text.strip()
-                # Assuming the LLM responds with "AF_ABBREVIATION" or "AF_ABBREVIATION: Justification"
-                if ":" in llm_suggested_af_raw:
-                    llm_suggested_af = llm_suggested_af_raw.split(":")[0].strip()
-                    justification = llm_suggested_af_raw.split(":")[1:]
-                    llm_suggested_af = llm_suggested_af.strip()
-                else:
-                    llm_suggested_af = llm_suggested_af_raw.strip()
-                    justification = "Nothing"
-
-                print(f"LLM suggested AF: {llm_suggested_af} justified by: {justification}")
-                break # Success, exit retry loop
-
-            else:
-                print("LLM returned no text content in response.")
-                llm_suggested_af = "UCB" # Or handle as an error
-                break
-
-        except ResourceExhausted as e:
-            error_message = str(e) # Get the full string representation of the error
-            suggested_delay_seconds = current_delay # Default to current backoff delay
-
-            # Use regex to find the retry_delay from the error string
-            match = re.search(r"retry_delay \{[\s\n]+seconds: (\d+)[\s\n]+\}", error_message)
-            if match:
-                try:
-                    suggested_delay_seconds = int(match.group(1))
-                    print(f"API suggested waiting {suggested_delay_seconds} seconds (parsed from error message).")
-                except ValueError:
-                    print("Could not parse suggested retry delay from error message. Using exponential backoff.")
-            else:
-                print("No specific retry_delay found in error message. Using exponential backoff.")
-
-
-            print(f"Rate limit hit (Retry {retries+1}/{MAX_RETRIES}).")
-            
-            # Use the parsed suggested delay, or our exponential backoff
-            wait_time = suggested_delay_seconds + random.uniform(0, suggested_delay_seconds * 0.1) # Add jitter
-            wait_time = min(wait_time, MAX_DELAY_SECONDS) # Cap the wait time
-
-            print(f"Waiting for {wait_time:.2f} seconds...")
-            time.sleep(wait_time)
-
-            retries += 1
-            current_delay = min(current_delay * 2, MAX_DELAY_SECONDS) # Double delay for next retry
-
-        except Exception as e:
-            print(f"An unexpected error occurred during API call: {e}")
-            break # Exit retry loop for other errors
-    else:
-        print(f"Failed to get LLM response for iteration {len(acq_type_list)} after {MAX_RETRIES} retries.")
-        return "Intentional Incorrect AF", chat, "Failed to get LLM response after retries"
-    return llm_suggested_af, chat, response.text.strip()  # Return the chat object and the response text for logging
-
-def last_guess(chat):
-    try:
-        response = chat.send_message(FINAL_GUESS)
-        if response.text:
-            print(response.text)
-            return response.text.strip()
-        else:
-            print("No text guesses")
-            return "No guesses"
-    except ResourceExhausted as e:
-        print("No more resources - no guessing")
-        return "No more resources - no guessing"
-
-class ConversationHolder:
+class LanguageModelAssistedAdaptiveBO:
     def __init__(
         self,
+        objective_func,
+        X_init,
+        Y_init,
+        bounds,
+        num_iterations,
         llm="api"
     ):
+        self.objective_func = objective_func
+        self.train_X  = X_init.clone()
+        self.train_Y  = Y_init.clone()
+        self.bounds = bounds
+        self.num_iterations = num_iterations
         self.llm = llm
-        self.messages = []
-        if self.llm == "api":
-            self.chat, initial_response = configure_and_start_chat_api()
-            self.messages.append(initial_response)
-        elif self.llm == "ops":
-            self.model, self.tokenizer, self.history = configure_and_start_chat_ops()
-            self.messages.append(self.history.turns[0][1])
-
-    
-
-
-
-def lm_assisted_adaptive_bo(
-        objective_func, 
-        X_init, 
-        Y_init, 
-        bounds, 
-        num_iterations, 
-        llm="api"
-    ):
-    # Configure and start the chat session with the initial context
-    if llm == "api":
-        chat, initial_response = configure_and_start_chat_api()
-    elif llm == "ops":
-        model, tokenizer, history = configure_and_start_chat_ops()
-    # Generate initial training data
-    train_X  = X_init.clone()
-    train_Y  = Y_init.clone()
-    best_values = [train_Y.min().item()]
-    acq_type_list = []
-    # optimization loop
-    gp = fit_gp(train_X, train_Y)
-    lengthscales = gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
-    outputscale = gp.covar_module.outputscale.detach().cpu().numpy()
-    remaining_iterations = num_iterations
-    messages = []  # Store messages for later use
-    messages.append(initial_response)  # Store the initial prompt content
-    for _ in range(num_iterations):
-        # use LLM to suggest the best acq_type
-        acq_type, chat, message = suggest_acq_type(
-            chat, 
-            train_X,
-            train_Y, 
-            acq_type_list, 
-            bounds,
-            lengthscales,
-            outputscale,
-            remaining_iterations,
-            llm
+        self.best_values = [self.train_Y.min().item()]
+        self.acq_type_list = []
+        # optimization loop
+        self.gp = fit_gp(self.train_X, self.train_Y)
+        self.lengthscales = self.gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
+        self.outputscale = self.gp.covar_module.outputscale.detach().cpu().numpy()
+        self.remaining_iterations = self.num_iterations
+        self.convo = ConversationHolder(
+            llm, 
+            first_prompt=INITIAL_PROMPT_CONTENT, 
+            last_prompt=FINAL_GUESS
         )
-        if acq_type == "Intentional Incorrect AF":
-            exit()
-        acq_type_list.append(acq_type)
-        # run one BO iter with the acq_type suggested by LLM
-        train_X, train_Y, gp = bo_single_iteration(train_X, train_Y, acq_type, objective_func, bounds)
-        lengthscales = gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
-        outputscale = gp.covar_module.outputscale.detach().cpu().numpy()
-        # Store best observed value
-        best_values.append(train_Y.min().item())
-        print(f"Current best value: {train_Y.min().item()}")
-        remaining_iterations -= 1
-        messages.append(message)  # Store the LLM's response message
-    messages.append(last_guess(chat))
-    return (
-        np.array(best_values) - objective_func._optimal_value, # simple regret
-        calculate_cumulative_regret(
-            train_Y.detach().cpu().numpy(), 
-            objective_func._optimal_value
-        ), # cumulative regret
-        np.array(train_X.detach().cpu().numpy()), 
-        np.array(train_Y.detach().cpu().numpy()).flatten(),
-        acq_type_list,
-        messages
-    )
+
+    def _construct_prompt(self):
+        # --- NEW: Calculate shortest distance of the last point relative to bounds ---
+        shortest_dist = get_shortest_distance_from_last_point(self.train_X, self.bounds)
+        # --- Calculate descriptive statistics ---
+        min_ls = np.min(self.lengthscales)
+        max_ls = np.max(self.lengthscales)
+        mean_ls = np.mean(self.lengthscales)
+        std_ls = np.std(self.lengthscales)
+
+        prompt = FOLLOW_UP_PROMPT_TEMPLATE.format(
+            N=self.train_Y.shape[0],
+            remaining=self.remaining_iterations,
+            D=self.train_X.shape[1],
+            f_min=np.round(self.train_Y.min().detach().cpu().numpy(), decimals=3).item(),
+            shortest_dist=shortest_dist,
+            min_ls=min_ls,
+            max_ls=max_ls,
+            mean_ls=mean_ls,
+            std_ls=std_ls,
+            outputscale=self.outputscale
+        )
+        print(f"Iter {len(self.acq_type_list)}|", prompt)
+        return prompt
+
+    def optimize(self):
+        acq_type_list = []
+        # Generate initial training data
+        for _ in range(self.num_iterations):
+            # use LLM to suggest the best acq_type
+            acq_type = self.convo.suggest_acq_type()
+            if acq_type == "Intentional Incorrect AF":
+                exit()
+            acq_type_list.append(acq_type)
+            # run one BO iter with the acq_type suggested by LLM
+            self.train_X, self.train_Y, self.gp = bo_single_iteration(
+                self.train_X, 
+                self.train_Y, 
+                acq_type, 
+                self.objective_func, 
+                self.bounds
+            )
+            self.lengthscales = self.gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
+            self.outputscale = self.gp.covar_module.outputscale.detach().cpu().numpy()
+            # Store best observed value
+            self.best_values.append(self.train_Y.min().item())
+            print(f"Current best value: {self.train_Y.min().item()}")
+            self.remaining_iterations -= 1
+        self.convo.last_guess()
+        return (
+            np.array(self.best_values) - self.objective_func._optimal_value, # simple regret
+            calculate_cumulative_regret(
+                self.train_Y.detach().cpu().numpy(), 
+                self.objective_func._optimal_value
+            ), # cumulative regret
+            np.array(self.train_X.detach().cpu().numpy()), 
+            np.array(self.train_Y.detach().cpu().numpy()).flatten(),
+            acq_type_list,
+            self.convo.messages
+        )

@@ -5,7 +5,7 @@ from bo import (
     gp_hedge_full_loop
 )
 from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR
-from lmabo import lm_assisted_adaptive_bo
+from lmabo import LanguageModelAssistedAdaptiveBO
 
 import argparse
 from botorch.test_functions import *
@@ -34,7 +34,12 @@ def save_results(folder_path, exp_idx, simple_regret, cum_regret, train_X, train
     np.save(f"{folder_path}/{exp_idx}_train_X.npy", train_X)
     np.save(f"{folder_path}/{exp_idx}_train_Y.npy", train_Y)
 
-def run_problem(problem, acq_type=None, starting_exp_idx=0):
+def run_problem(
+    problem,
+    acq_type=None, 
+    starting_exp_idx=0,
+    llm="api"
+):
     print(f"Running {acq_type}")
     # prepare function
     objective_func, dim, bounds = prepare_objective_func(problem)
@@ -56,12 +61,16 @@ def run_problem(problem, acq_type=None, starting_exp_idx=0):
         fixed_train_Y  = objective_func(fixed_train_X).unsqueeze(-1) # Evaluate function and reshape
         if acq_type == "lmabo":
             # run LMABO
-            simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = lm_assisted_adaptive_bo(
+            LMABO = LanguageModelAssistedAdaptiveBO(
                 objective_func, 
-                fixed_train_X, fixed_train_Y, 
+                fixed_train_X, 
+                fixed_train_Y, 
                 bounds, 
-                num_iterations
+                num_iterations,
+                llm
             )
+            # optimize and get results
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
             save_results(
                 folder_path, 
                 exp_idx, 
@@ -134,12 +143,18 @@ if __name__=="__main__":
         default=-1,
         help="Which experiment to run",        
     )
+    argparser.add_argument(
+        "--llm",
+        type=str,
+        default="api",
+        help="LLM to use for LMABO. Options: 'api', 'ops'",
+    )
     args = argparser.parse_args()
     starting_exp_idx = max(0, args.starting_exp_idx)
     if args.method == "bo":
         for acq_type in acq_type_mapping.keys():
             run_problem(args.problem, acq_type, starting_exp_idx)
     elif args.method == "lmabo":
-        run_problem(args.problem, "lmabo", starting_exp_idx)
+        run_problem(args.problem, "lmabo", starting_exp_idx, args.llm)
     elif args.method == "gphedge":
         run_problem(args.problem, "gphedge", starting_exp_idx)    
