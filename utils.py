@@ -344,9 +344,9 @@ def plot_results(problem_name, result_type, acq_type_list=list(acq_type_mapping.
         if result_type == "best_val":
             raw_result = read_raw_result(problem_name, acq_type, "train_Y")
             if raw_result[0].shape[0] > 100:
-                raw_result = [result[-51:] for result in raw_result]
-            else:
                 raw_result = [result[-101:] for result in raw_result]
+            else:
+                raw_result = [result[-51:] for result in raw_result]
             acq_type_values = [np.minimum.accumulate(result) for result in raw_result]
         else:
             raw_result = read_raw_result(problem_name, acq_type, result_type)

@@ -108,12 +108,11 @@ def get_valid_key():
     else:
         print(f"Using valid key: {valid_key[:8]}...")
         return valid_key
-
-def configure_and_start_chat():
-    """
-    Configure the Gemini model and start a chat session with the initial context.
-    Returns the chat object.
-    """
+    
+def configure_and_start_chat_api():
+    import google.generativeai as genai
+    from google.api_core.exceptions import ResourceExhausted
+    from key import API_KEYS
     valid_key = get_valid_key()
     genai.configure(api_key=valid_key)
     # init LLM
@@ -134,10 +133,45 @@ def configure_and_start_chat():
     except Exception as e:
         print(f"Error starting chat or initial acknowledgement: {e}")
         print("Please check your API key, model availability, and network connection.")
-        exit() # Exit if we can't even start the chat
+        exit() # Exit if we can't even start the chat    
 
+class ChatHistory:
+    def __init__(self):
+        self.turns = []
 
-def suggest_acq_type(chat, train_X, train_Y, acq_type_list, bounds, lengthscales, outputscale, remaining_iterations):
+    def add_turn(self, user, assistant):
+        self.turns.append({"user": user, "assistant": assistant})
+
+    def format_prompt(self, new_user_input=None):
+        prompt = ""
+        for turn in self.turns:
+            prompt += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
+        if new_user_input is not None:
+            prompt += f"User: {new_user_input}\nAssistant:"
+        return prompt
+    
+def model_answer(model, tokenizer, prompt):
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(**inputs, max_new_tokens=256, do_sample=True, temperature=0.7)
+    response = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)    
+    return response
+
+def configure_and_start_chat_ops():
+    from transformers import AutoModelForCausalLM, AutoTokenizer
+    # Load Qwen3 model and tokenizer from Hugging Face Hub
+    model_name = "Qwen/Qwen3-8B"
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16, device_map="auto")
+    print("Initialized Qwen3")
+    # Start a conversation
+    history = ChatHistory()
+    prompt = history.format_prompt(INITIAL_PROMPT_CONTENT)
+    response = model_answer(model, tokenizer, prompt)
+    print("Assistant:", response.strip())
+    history.add_turn(INITIAL_PROMPT_CONTENT, response.strip())
+    return model, tokenizer, history
+
+def suggest_acq_type(chat, train_X, train_Y, acq_type_list, bounds, lengthscales, outputscale, remaining_iterations, llm="api"):
     # --- NEW: Calculate shortest distance of the last point relative to bounds ---
     shortest_dist = get_shortest_distance_from_last_point(train_X, bounds)
     if lengthscales is not None:
@@ -241,9 +275,37 @@ def last_guess(chat):
         print("No more resources - no guessing")
         return "No more resources - no guessing"
 
-def lm_assisted_adaptive_bo(objective_func, X_init, Y_init, bounds, num_iterations):
+class ConversationHolder:
+    def __init__(
+        self,
+        llm="api"
+    ):
+        self.llm = llm
+        self.messages = []
+        if self.llm == "api":
+            self.chat, initial_response = configure_and_start_chat_api()
+            self.messages.append(initial_response)
+        elif self.llm == "ops":
+            self.model, self.tokenizer, self.history = configure_and_start_chat_ops()
+            self.messages.append(self.history.turns[0][1])
+
+    
+
+
+
+def lm_assisted_adaptive_bo(
+        objective_func, 
+        X_init, 
+        Y_init, 
+        bounds, 
+        num_iterations, 
+        llm="api"
+    ):
     # Configure and start the chat session with the initial context
-    chat, initial_response = configure_and_start_chat()
+    if llm == "api":
+        chat, initial_response = configure_and_start_chat_api()
+    elif llm == "ops":
+        model, tokenizer, history = configure_and_start_chat_ops()
     # Generate initial training data
     train_X  = X_init.clone()
     train_Y  = Y_init.clone()
@@ -266,7 +328,8 @@ def lm_assisted_adaptive_bo(objective_func, X_init, Y_init, bounds, num_iteratio
             bounds,
             lengthscales,
             outputscale,
-            remaining_iterations
+            remaining_iterations,
+            llm
         )
         if acq_type == "Intentional Incorrect AF":
             exit()

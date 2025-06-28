@@ -68,6 +68,9 @@ class Easom(SyntheticTestFunction):
         # The result should have dimensions corresponding to batch_shape
         return term1 * term2
     
+    def evaluate_true(self, X):
+        return self._evaluate_true(X)
+    
 # optimal values for COCO functions estimated with 1,000,000 random samples    
 COCO_OPTIMAL_VALUE = {
     "Sphere": 79.5188, 
@@ -120,6 +123,9 @@ def create_coco_class(function_id, dimension, problem_name):
             for i in range(X.shape[0]):
                 result[i] = self.problem(X[i].cpu().numpy())
             return result
+        
+        def evaluate_true(self, X):
+            return self._evaluate_true(X)
         
         def __del__(self):
             if hasattr(self, 'suite'):
