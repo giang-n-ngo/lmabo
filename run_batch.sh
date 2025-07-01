@@ -14,7 +14,8 @@
 # )
 problems=("Ackley" "DixonPrice" "Griewank" "Powell" "Rosenbrock" "StyblinskiTang" "AttractiveSector" "RosenbrockRotated" "Discus" "DifferentPowers" "SchaffersIllCond" "CompositeGriewankRosenbrock")
 # method="lmabo"
-method="bo"
+method="lmabo-ops"
+# method="bo"
 # method="gphedge"
 
 # Loop over each problem and algorithm

@@ -1,14 +1,13 @@
 import numpy as np
 
-from bo import bo_single_iteration, fit_gp, calculate_cumulative_regret
+from bo import bo_single_iteration, fit_gp, calculate_cumulative_regret, acq_type_mapping
 from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
 
 INITIAL_PROMPT_CONTENT = """
-You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. 
-Your goal is to advise on the optimal strategy to efficiently find the global minimum of a black-box function.
+You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. Your goal is to advise on the optimal strategy to efficiently find the global minimum of a black-box function.
 
-We use a Gaussian Process with a Matern 5/2 kernel with ARD. Prefer exploration in the early iterations and exploitation in the later ones, but always consider the current state of the optimization process.
+We use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD. Prefer exploration in the early iterations and exploitation in the later ones, but always consider the current state of the optimization process.
 
 I will provide you with a summary of the Bayesian Optimization process at each step. This summary will include the following information:
 - **N:** The total number of points evaluated so far.
@@ -39,7 +38,7 @@ At each step:
 - **Select the acquisition function that you believe will be best for the optimization process.**
 - **Avoid reusing acquisition functions that failed to improve the objective function in previous iterations.**
 
-**Please respond with ONLY the abbreviation of the selected acquisition function, followed by a colon and then a brief justification. Do not include any other text, greetings, or additional formatting.**
+**Respond with ONLY the above abbreviation of the selected acquisition function, followed by a colon and then a brief justification (i.e. "AF: justification paragraph"). Do not include any other text, greetings, or additional formatting.**
 """
 
 FOLLOW_UP_PROMPT_TEMPLATE = """
@@ -83,7 +82,7 @@ class LanguageModelAssistedAdaptiveBO:
         self.convo = ConversationHolder(
             llm, 
             first_prompt=INITIAL_PROMPT_CONTENT, 
-            last_prompt=FINAL_GUESS
+            full_acq_type_list=list(acq_type_mapping.keys())
         )
 
     def _construct_prompt(self):
@@ -115,7 +114,7 @@ class LanguageModelAssistedAdaptiveBO:
         # Generate initial training data
         for _ in range(self.num_iterations):
             # use LLM to suggest the best acq_type
-            acq_type = self.convo.suggest_acq_type()
+            acq_type = self.convo.suggest_acq_type(self._construct_prompt())
             if acq_type == "Intentional Incorrect AF":
                 exit()
             acq_type_list.append(acq_type)

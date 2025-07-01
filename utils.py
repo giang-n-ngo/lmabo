@@ -1,4 +1,3 @@
-import google.generativeai as genai
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -86,16 +85,6 @@ def get_shortest_distance_from_last_point(X, bounds):
     shortest_dist = torch.min(distances).item()
 
     return shortest_dist
- 
-def check_available_model():
-    # List all available models
-    print("Listing available models and their supported methods:")
-    for m in genai.list_models():
-        # Check if the model supports the 'generateContent' method
-        if 'generateContent' in m.supported_generation_methods:
-            print(f"  Model Name: {m.name}, Supported Methods: {m.supported_generation_methods}")
-        else:
-            print(f"  Model Name: {m.name}, (Does NOT support generateContent)")
         
 def get_rank_dict(dictionary, reverse=True):
     """

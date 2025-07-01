@@ -1,15 +1,20 @@
-import google.generativeai as genai
 import random
 import re
 import time
 import torch
-
+import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 from transformers import AutoModelForCausalLM, AutoTokenizer
 
-from key import API_KEYS
-
-
+def check_available_model():
+    # List all available models
+    print("Listing available models and their supported methods:")
+    for m in genai.list_models():
+        # Check if the model supports the 'generateContent' method
+        if 'generateContent' in m.supported_generation_methods:
+            print(f"  Model Name: {m.name}, Supported Methods: {m.supported_generation_methods}")
+        else:
+            print(f"  Model Name: {m.name}, (Does NOT support generateContent)")
 
 def test_api_key(key):
     """
@@ -92,7 +97,7 @@ class ChatHistory:
     
 def model_answer(model, tokenizer, prompt):
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    outputs = model.generate(**inputs, max_new_tokens=256, do_sample=True, temperature=0.7)
+    outputs = model.generate(**inputs, max_new_tokens=256, do_sample=True, temperature=1.0)
     response = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)    
     return response
 
@@ -115,10 +120,10 @@ class ConversationHolder:
         self,
         llm="api",
         first_prompt="",
-        acq_type_list=[]
+        full_acq_type_list=[]
     ):
         self.llm = llm
-        self.acq_type_list = acq_type_list
+        self.full_acq_type_list = full_acq_type_list
         self.messages = []
         if self.llm == "api":
             self.chat, initial_response = configure_and_start_chat_api(first_prompt)
@@ -127,8 +132,9 @@ class ConversationHolder:
             self.api_max_entries = 10
             self.api_max_delay_seconds = 120
         elif self.llm == "ops":
+            from transformers import AutoModelForCausalLM, AutoTokenizer
             self.model, self.tokenizer, self.history = configure_and_start_chat_ops(first_prompt)
-            self.messages.append(self.history.turns[0][1])
+            self.messages.append(self.history.turns[0]["assistant"])
         self.default_af = "UCB"
 
     def _process_suggestion_response(self, response_text):
@@ -143,12 +149,13 @@ class ConversationHolder:
             tuple: Suggested AF and its justification.
         """
         if ":" in response_text:
-            af, justification = response_text.split(":", 1)
+            print(response_text)
+            af, justification = response_text.split(":")
             af = af.strip()
             justification = justification.strip()
         else:
             af = response_text.strip()
-            if af not in self.acq_type_list:
+            if af not in self.full_acq_type_list:
                 af = self.default_af
             justification = "Nothing"
         print(f"LLM suggested AF: {af} justified by: {justification}")
@@ -166,7 +173,7 @@ class ConversationHolder:
                 response = self.chat.send_message(prompt)
 
                 if response.text:
-                    llm_suggested_af_raw = self._process_suggestion_response(response.text)
+                    llm_suggested_af = self._process_suggestion_response(response.text)
                     break # Success, exit retry loop
 
                 else:
@@ -225,11 +232,11 @@ class ConversationHolder:
             llm_suggested_af = "Intentional Incorrect AF"
         return llm_suggested_af
     
-    def suggest_acq_type(self):
+    def suggest_acq_type(self, prompt):
         if self.llm == "api":
-            return self._api_suggest_acq_type()
+            return self._api_suggest_acq_type(prompt)
         elif self.llm == "ops":
-            return self._ops_suggest_acq_type()
+            return self._ops_suggest_acq_type(prompt)
         
     def _api_last_guess(self, last_prompt):
         try:
