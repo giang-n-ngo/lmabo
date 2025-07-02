@@ -4,9 +4,8 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --constraint=gpu-v100
-#SBATCH --time=12:00:00 
-#SBATCH --mem=6G
+#SBATCH --time=24:00:00 
+#SBATCH --mem=24G
 #SBATCH --cpus-per-gpu=4
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END

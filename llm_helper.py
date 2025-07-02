@@ -62,7 +62,7 @@ def get_valid_key():
     else:
         print(f"Using valid key: {valid_key[:8]}...")
         return valid_key
-    
+
 def configure_and_start_chat_api(first_prompt):
     valid_key = get_valid_key()
     genai.configure(api_key=valid_key)
@@ -96,6 +96,16 @@ class QwenChatbot:
         )
         self.history = []
 
+    def _clean_response(self, response_text):
+        """Remove <think> tags and their content from the response."""
+        # Remove everything between <think> and </think> tags (including newlines)
+        cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+        # Remove any remaining <think> or </think> tags
+        cleaned = re.sub(r'</?think>', '', cleaned)
+        # Clean up extra whitespace but preserve structure
+        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
+        return cleaned.strip()
+
     @torch.inference_mode()
     def generate_response(self, user_input):
         messages = self.history + [{"role": "user", "content": user_input}]
@@ -114,12 +124,13 @@ class QwenChatbot:
             pad_token_id=self.tokenizer.eos_token_id
         )[0][len(inputs.input_ids[0]):].tolist()
         response = self.tokenizer.decode(response_ids, skip_special_tokens=True)
+        cleaned_response = self._clean_response(response)
 
         # Update history
         self.history.append({"role": "user", "content": user_input})
-        self.history.append({"role": "assistant", "content": response})
+        self.history.append({"role": "assistant", "content": cleaned_response})
 
-        return response
+        return cleaned_response
 
 def configure_and_start_chat_ops(first_prompt):
     # Load Qwen3 model and tokenizer from Hugging Face Hub
@@ -241,18 +252,12 @@ class ConversationHolder:
         
         Returns:
             str: Suggested AF
-        """
-        print("Raw response:", response_text)
-        
-        # Remove <think> tags and their content
-        cleaned_response = self._clean_response(response_text)
-        print("Cleaned response:", cleaned_response)
-        
+        """        
         # Extract AF and justification
         af = self.default_af
         justification = "Nothing"
         
-        af, justification = cleaned_response.split(":", maxsplit=1)
+        af, justification = response_text.split(":", maxsplit=1)
         
         # Validate AF is in the allowed list
         if af not in self.full_acq_type_list:
@@ -260,18 +265,8 @@ class ConversationHolder:
             af = self.default_af
         
         print(f"LLM suggested AF: {af} justified by: {justification}")
-        self.messages.append(cleaned_response)
+        self.messages.append(response_text)
         return af
-
-    def _clean_response(self, response_text):
-        """Remove <think> tags and their content from the response."""
-        # Remove everything between <think> and </think> tags (including newlines)
-        cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-        # Remove any remaining <think> or </think> tags
-        cleaned = re.sub(r'</?think>', '', cleaned)
-        # Clean up extra whitespace but preserve structure
-        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
-        return cleaned.strip()
 
     def _ops_suggest_acq_type(self, prompt):
         llm_suggested_af = self.default_af
@@ -287,7 +282,7 @@ class ConversationHolder:
             print(f"An error occurred during LLM call: {e}")
             llm_suggested_af = "Intentional Incorrect AF"
         return llm_suggested_af
-    
+
     def suggest_acq_type(self, prompt):
         if self.llm == "api":
             return self._api_suggest_acq_type(prompt)

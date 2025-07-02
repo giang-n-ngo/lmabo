@@ -5,17 +5,21 @@ from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
 
 INITIAL_PROMPT_CONTENT = """
-You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. Your goal is to advise on the optimal strategy to efficiently find the global minimum of a black-box function.
+You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. 
+Your goal is to advise on the optimal strategy to efficiently find the global minimum of a black-box function.
 
-We use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD. Prefer exploration in the early iterations and exploitation in the later ones, but always consider the current state of the optimization process.
+We use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD. 
+Prefer exploration in the early iterations and exploitation in the later ones, but always consider the current state of the optimization process.
 
 I will provide you with a summary of the Bayesian Optimization process at each step. This summary will include the following information:
 - **N:** The total number of points evaluated so far.
 - **Remaining iterations:** The number of iterations left in the optimization process.
 - **D:** The dimensionality of the search space (number of input parameters).
+- **f_range:** The range of the objective function values observed so far.
 - **f_min:** The current best (lowest) observed objective value.
 - **Shortest distance**: The shortest distance from the last point to any other point, indicating whether it is exploiting too much.
-- **Model lengthscales:** These are crucial hyperparameters of the Gaussian Process model's kernel. They describe how the model perceives the smoothness and relevance of each input dimension to the objective function. 
+- **Model lengthscales:** These are crucial hyperparameters of the Gaussian Process model's kernel. 
+They describe how the model perceives the smoothness and relevance of each input dimension to the objective function. 
 You will receive their range (min/max), mean, and standard deviation, along with qualitative descriptions of their variability and overall scale (e.g., if they are generally small, implying a complex function, or large, implying a smooth one).
 - **Model outputscale: ** It defines the overall magnitude or amplitude of the function's variation.
 
@@ -38,7 +42,11 @@ At each step:
 - **Select the acquisition function that you believe will be best for the optimization process.**
 - **Avoid reusing acquisition functions that failed to improve the objective function in previous iterations.**
 
-**Respond with ONLY the above abbreviation of the selected acquisition function, followed by a colon and then a brief justification (i.e. "AF: justification paragraph"). Do not include any other text, greetings, or additional formatting.**
+When responding, select the acquisition function you deem most appropriate. 
+Your justification should briefly explain why that function is suitable given the provided optimization summary, referencing relevant aspects like exploration/exploitation balance, remaining iterations, or model characteristics. 
+The response should be in the format "Acquisition abbreviation: justification", similar to these examples:
+- 'qKG: This is a good choice because ...'
+- 'EI: This is chosen given the current state of the optimization since ...'
 """
 
 FOLLOW_UP_PROMPT_TEMPLATE = """
@@ -46,6 +54,7 @@ Current optimization state:
 - N: {N} 
 - Remaining iterations: {remaining}
 - D: {D}
+- f_range: Range [{f_min:.3f}, {f_max:.3f}], Mean {f_mean:.3f} (Std Dev {f_std:.3f})
 - f_min: {f_min:.3f}
 - Shortest distance: {shortest_dist}
 - Lengthscales: Range [{min_ls:.3f}, {max_ls:.3f}], Mean {mean_ls:.3f} (Std Dev {std_ls:.3f})
@@ -98,6 +107,9 @@ class LanguageModelAssistedAdaptiveBO:
             N=self.train_Y.shape[0],
             remaining=self.remaining_iterations,
             D=self.train_X.shape[1],
+            f_max=np.round(self.train_Y.max().detach().cpu().numpy(), decimals=3).item(),
+            f_mean=np.round(self.train_Y.mean().detach().cpu().numpy(), decimals=3).item(),
+            f_std=np.round(self.train_Y.std().detach().cpu().numpy(), decimals=3).item(),
             f_min=np.round(self.train_Y.min().detach().cpu().numpy(), decimals=3).item(),
             shortest_dist=shortest_dist,
             min_ls=min_ls,
@@ -110,14 +122,13 @@ class LanguageModelAssistedAdaptiveBO:
         return prompt
 
     def optimize(self):
-        acq_type_list = []
         # Generate initial training data
         for _ in range(self.num_iterations):
             # use LLM to suggest the best acq_type
             acq_type = self.convo.suggest_acq_type(self._construct_prompt())
             if acq_type == "Intentional Incorrect AF":
                 exit()
-            acq_type_list.append(acq_type)
+            self.acq_type_list.append(acq_type)
             # run one BO iter with the acq_type suggested by LLM
             self.train_X, self.train_Y, self.gp = bo_single_iteration(
                 self.train_X, 
@@ -141,6 +152,6 @@ class LanguageModelAssistedAdaptiveBO:
             ), # cumulative regret
             np.array(self.train_X.detach().cpu().numpy()), 
             np.array(self.train_Y.detach().cpu().numpy()).flatten(),
-            acq_type_list,
+            self.acq_type_list,
             self.convo.messages
         )
