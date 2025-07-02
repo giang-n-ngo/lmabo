@@ -1,10 +1,16 @@
+import os
+os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # Suppress warnings
 import random
 import re
 import time
 import torch
+torch.backends.cudnn.benchmark = True
+torch.backends.cuda.matmul.allow_tf32 = True
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 from transformers import AutoModelForCausalLM, AutoTokenizer
+
+from key import API_KEYS
 
 def check_available_model():
     # List all available models
@@ -80,40 +86,49 @@ def configure_and_start_chat_api(first_prompt):
         print("Please check your API key, model availability, and network connection.")
         exit() # Exit if we can't even start the chat    
 
-class ChatHistory:
-    def __init__(self):
-        self.turns = []
+class QwenChatbot:
+    def __init__(self, model_name):
+        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
+        self.model = AutoModelForCausalLM.from_pretrained(
+            model_name,    
+            torch_dtype="auto",
+            device_map="auto"
+        )
+        self.history = []
 
-    def add_turn(self, user, assistant):
-        self.turns.append({"user": user, "assistant": assistant})
+    @torch.inference_mode()
+    def generate_response(self, user_input):
+        messages = self.history + [{"role": "user", "content": user_input}]
 
-    def format_prompt(self, new_user_input=None):
-        prompt = ""
-        for turn in self.turns:
-            prompt += f"User: {turn['user']}\nAssistant: {turn['assistant']}\n"
-        if new_user_input is not None:
-            prompt += f"User: {new_user_input}\nAssistant:"
-        return prompt
-    
-def model_answer(model, tokenizer, prompt):
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    outputs = model.generate(**inputs, max_new_tokens=256, do_sample=True, temperature=1.0)
-    response = tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:], skip_special_tokens=True)    
-    return response
+        text = self.tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True
+        )
+
+        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
+        response_ids = self.model.generate(
+            **inputs, 
+            max_new_tokens=32768,
+            use_cache=True,  # Enable KV caching
+            pad_token_id=self.tokenizer.eos_token_id
+        )[0][len(inputs.input_ids[0]):].tolist()
+        response = self.tokenizer.decode(response_ids, skip_special_tokens=True)
+
+        # Update history
+        self.history.append({"role": "user", "content": user_input})
+        self.history.append({"role": "assistant", "content": response})
+
+        return response
 
 def configure_and_start_chat_ops(first_prompt):
     # Load Qwen3 model and tokenizer from Hugging Face Hub
-    model_name = "Qwen/Qwen3-8B"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForCausalLM.from_pretrained(model_name, torch_dtype=torch.float16, device_map="auto")
+    chatbot = QwenChatbot(model_name="Qwen/Qwen3-8B")
     print("Initialized Qwen3")
     # Start a conversation
-    history = ChatHistory()
-    prompt = history.format_prompt(first_prompt)
-    response = model_answer(model, tokenizer, prompt)
+    response = chatbot.generate_response(first_prompt)
     print("Assistant:", response.strip())
-    history.add_turn(first_prompt, response.strip())
-    return model, tokenizer, history
+    return chatbot
 
 class ConversationHolder:
     def __init__(
@@ -132,12 +147,11 @@ class ConversationHolder:
             self.api_max_entries = 10
             self.api_max_delay_seconds = 120
         elif self.llm == "ops":
-            from transformers import AutoModelForCausalLM, AutoTokenizer
-            self.model, self.tokenizer, self.history = configure_and_start_chat_ops(first_prompt)
-            self.messages.append(self.history.turns[0]["assistant"])
+            self.chatbot = configure_and_start_chat_ops(first_prompt)
+            self.messages.append(self.chatbot.history[-1]["content"])
         self.default_af = "UCB"
 
-    def _process_suggestion_response(self, response_text):
+    def _api_process_suggestion_response(self, response_text):
         """
         Process the response text from the LLM to extract the suggested acquisition function (AF)
         and its justification.
@@ -148,8 +162,8 @@ class ConversationHolder:
         Returns:
             tuple: Suggested AF and its justification.
         """
+        print(response_text)
         if ":" in response_text:
-            print(response_text)
             af, justification = response_text.split(":")
             af = af.strip()
             justification = justification.strip()
@@ -173,7 +187,7 @@ class ConversationHolder:
                 response = self.chat.send_message(prompt)
 
                 if response.text:
-                    llm_suggested_af = self._process_suggestion_response(response.text)
+                    llm_suggested_af = self._api_process_suggestion_response(response.text)
                     break # Success, exit retry loop
 
                 else:
@@ -216,14 +230,56 @@ class ConversationHolder:
             print(f"Failed to get LLM response after {self.api_max_entries} retries.")
             return "Intentional Incorrect AF"
         return llm_suggested_af  # Return the chat object and the response text for logging
-    
+
+    def _ops_process_suggestion_response(self, response_text):
+        """
+        Process the response text from the LLM to extract the suggested acquisition function (AF)
+        and its justification.
+        
+        Args:
+            response_text (str): The raw response text from the LLM.
+        
+        Returns:
+            str: Suggested AF
+        """
+        print("Raw response:", response_text)
+        
+        # Remove <think> tags and their content
+        cleaned_response = self._clean_response(response_text)
+        print("Cleaned response:", cleaned_response)
+        
+        # Extract AF and justification
+        af = self.default_af
+        justification = "Nothing"
+        
+        af, justification = cleaned_response.split(":", maxsplit=1)
+        
+        # Validate AF is in the allowed list
+        if af not in self.full_acq_type_list:
+            print(f"Invalid AF '{af}', using default '{self.default_af}'")
+            af = self.default_af
+        
+        print(f"LLM suggested AF: {af} justified by: {justification}")
+        self.messages.append(cleaned_response)
+        return af
+
+    def _clean_response(self, response_text):
+        """Remove <think> tags and their content from the response."""
+        # Remove everything between <think> and </think> tags (including newlines)
+        cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+        # Remove any remaining <think> or </think> tags
+        cleaned = re.sub(r'</?think>', '', cleaned)
+        # Clean up extra whitespace but preserve structure
+        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
+        return cleaned.strip()
+
     def _ops_suggest_acq_type(self, prompt):
         llm_suggested_af = self.default_af
         try:
-            response = model_answer(self.model, self.tokenizer, prompt)
+            response = self.chatbot.generate_response(prompt)
             if response:
-                llm_suggested_af = self._process_suggestion_response(response.strip())
-                self.history.add_turn(prompt, response.strip())
+                llm_suggested_af = self._ops_process_suggestion_response(response.strip())
+                self.messages.append(response.strip())
             else:
                 print("LLM returned no text content in response.")
                 llm_suggested_af = self.default_af # Or handle as an error
@@ -254,10 +310,9 @@ class ConversationHolder:
         
     def _ops_last_guess(self, last_prompt):
         try:
-            response = model_answer(self.model, self.tokenizer, last_prompt)
+            response = self.chatbot.generate_response(last_prompt)
             if response:
                 print(response.strip())
-                self.history.add_turn(last_prompt, response.strip())
                 self.messages.append(response.strip())
                 return response.strip()
             else:

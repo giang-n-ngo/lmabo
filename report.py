@@ -29,7 +29,8 @@ if args.setting == "bo":
     active_acq_type_list += [
         "lmabo",
         "gphedge",
-        "llmgp"
+        "llmgp",
+        "llambo"
     ]
     excepted_acq_type_list = [
     ]
@@ -52,11 +53,14 @@ if args.setting == "bo":
     for problem in completed_problems:
         relative_simple_reg = report_relative_reg(problem, "simple_regret", problem_result[problem], True, True)
         for acq_type in relative_simple_reg.keys():
-            all_relative_simple_reg[acq_type].append(relative_simple_reg[acq_type])
+            all_relative_simple_reg[acq_type].append(relative_simple_reg[acq_type].item())
         print("=="*35)
     print("Summary relative simple regret (lower better):")
-    mean_relative_simple_reg = {acq_type: np.mean(val) for acq_type, val in all_relative_simple_reg.items()}
-    std_relative_simple_reg = {acq_type: np.std(val) for acq_type, val in all_relative_simple_reg.items()}
+    mean_relative_simple_reg = {}
+    std_relative_simple_reg = {}
+    for acq_type, val in all_relative_simple_reg.items():
+        mean_relative_simple_reg[acq_type] = np.mean(val)
+        std_relative_simple_reg[acq_type] = np.std(val)
     print("Mean")
     print_sorted_dict(mean_relative_simple_reg, reverse=False)
     print("Std")
@@ -66,37 +70,7 @@ if args.setting == "bo":
         plot_results(problem, "simple_regret", full_acq_type_list)
         plot_results(problem, "best_val", full_acq_type_list)
 elif args.setting == "moo":
-    from moo import MOO_OBJECTIVE_FUNCTIONS, moo_acq_type_mapping
-    moo_acq_type_list = list(moo_acq_type_mapping.keys())
-    problems = []
-    for item in MOO_OBJECTIVE_FUNCTIONS:
-        if hasattr(item, "name"):
-            problems.append(item.name)
-        else:
-            problems.append(item.__name__)
-    completed_problems = report_completion(problems, moo_acq_type_list)
-    print(f"Completed {len(completed_problems)} problems out of {len(problems)}")
-    print("Total HV ranking (higher better):")
-    report_ranking(problems, "hv", reverse=False, acq_type_list=moo_acq_type_list)
-    all_relative_hv = {acq_type: 0 for acq_type in moo_acq_type_list+['lmabo']}
-    for problem in problems:
-        relative_hv = report_relative_reg(problem, "hv", True, False, moo_acq_type_list)
-        for acq_type in relative_hv.keys():
-            all_relative_hv[acq_type] = all_relative_hv[acq_type] + relative_hv[acq_type]
-        print("=="*20)
-    print("Total relative HV (higher better):")
-    print_sorted_dict(all_relative_hv, reverse=False)
-    print("Total log HV difference ranking (lower better):")
-    report_ranking(problems, "log_hv_diff", reverse=True, acq_type_list=moo_acq_type_list)
-    all_relative_log_hv_diff = {acq_type: 0 for acq_type in moo_acq_type_list+['lmabo']}
-    for problem in problems:
-        relative_log_hv_diff = report_relative_reg(problem, "log_hv_diff", True, True, moo_acq_type_list)
-        for acq_type in relative_log_hv_diff.keys():
-            all_relative_log_hv_diff[acq_type] = all_relative_log_hv_diff[acq_type] + relative_log_hv_diff[acq_type]
-        print("=="*20)
-    print("Total relative log HV difference (lower better):")
-    print_sorted_dict(all_relative_log_hv_diff, reverse=False)
-
+    pass
 elif args.setting == "constrained":
     pass
 # Don't forget to close the file

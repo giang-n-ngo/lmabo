@@ -26,7 +26,12 @@ matplotlib_colors = [
     '#b2df8a',  # Light Green
     '#fb9a99',  # Light Red
     '#fdbf6f',  # Light Orange
-    '#cab2d6'   # Light Purple
+    '#cab2d6',   # Light Purple
+    '#ff1493',  # Deep Pink
+    '#32cd32',  # Lime Green
+    '#ff6347',  # Tomato Red
+    '#4169e1',  # Royal Blue
+    '#daa520'   # Goldenrod
 ]
 
 def get_shortest_distance_from_last_point(X, bounds):
@@ -125,6 +130,8 @@ def read_raw_result(problem, acq_type, result_type):
             else:
                 file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
             simple_regret = np.load(file_name)
+            if np.isnan(simple_regret).any():
+                print(file_name)
             raw_result.append(simple_regret)
         except FileNotFoundError:
             continue 
@@ -297,7 +304,7 @@ def report_completion(
                 # Check if this acquisition type has all runs
                 if count < EXP_RUNS and acq not in excepted_acq_type_list:
                     problem_complete = False
-            elif acq == "llmgp":
+            elif acq == "llmgp" or acq == "llambo":
                 if not os.path.exists(folder_path):
                     count = 0
                 else:
