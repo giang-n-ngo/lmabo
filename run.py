@@ -119,6 +119,7 @@ def run_problem(
             )
             # optimize and get results
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
+            del LMABO  # Free memory
         elif acq_type == "gphedge":
             # run GP-Hedge
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = gp_hedge_full_loop(
@@ -148,7 +149,7 @@ def run_problem(
             messages=messages,
             weights=weights
         )
-        del fixed_train_X, fixed_train_Y  # Free memory
+        del fixed_train_X, fixed_train_Y, train_X, train_Y  # Free memory
 
 def parse_arguments():
     """Parse command line arguments."""

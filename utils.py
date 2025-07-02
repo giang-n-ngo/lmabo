@@ -233,7 +233,7 @@ def report_relative_reg(
         print(f"Best method: {best_method_name} (baseline)")
         print(f"Relative {result_type} AUC (compared to best):")
         print("-" * 50)
-        print(f"{'Method':<15} | {'Relative Regret':>33} | {'vs. Best':>10}")
+        print(f"{'Method':<15} | {'Relative':>33} | {'vs. Best':>10}")
         print("-" * 50)
         for method, rel_regret in sorted_performance.items():
             if reverse:
@@ -293,7 +293,7 @@ def report_completion(
                 folder_path = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp"
             else:
                 folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
-            if acq == "lmabo" or acq == "gphedge":
+            if acq in ["lmabo", "lmamoo", "gphedge"]:
                 if not os.path.exists(folder_path):
                     count = 0
                 else:

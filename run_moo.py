@@ -1,7 +1,11 @@
-from moo import mobo_full_loop, moo_acq_type_mapping, prepare_objective_func_moo
+from moo import (
+    mobo_full_loop, 
+    moo_acq_type_mapping, 
+    prepare_objective_func_moo, 
+    MOO_NUM_ITERATIONS
+)
 from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR
 from lmamoo import lm_assisted_adaptive_moo
-from utils import plot_results
 
 import argparse
 import numpy as np
@@ -35,15 +39,14 @@ def run_problem(problem, acq_type=None):
     objective_func, dim, bounds = prepare_objective_func_moo(problem)
     bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)  # Search space bounds
     # Experiment settings
-    print(device, bounds.device)
     num_initial_points = 2 * dim + 1
-    num_iterations = 50 if dim <= 10 else 100
+    num_iterations = MOO_NUM_ITERATIONS[problem]
     folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
     os.makedirs(folder_path, exist_ok=True)
     
     for exp_idx in range(EXP_RUNS):
-        print(f"RUN {exp_idx}")
-        if os.path.exists(f"{folder_path}/{exp_idx}.npy"):
+        print(f"RUN {exp_idx} on {device}")
+        if os.path.exists(f"{folder_path}/{exp_idx}_hv.npy"):
             print("Completed!")
             continue
         
@@ -54,46 +57,45 @@ def run_problem(problem, acq_type=None):
         
         if acq_type != "lmamoo":
             # Run multi-objective optimization loop
-            hv_list, log_hv_diff_list, train_X, train_Y = mobo_full_loop(
-                objective_func,
-                acq_type,
-                fixed_train_X,
-                fixed_train_Y,
-                bounds,
-                num_iterations
-            )
-            
-            save_results(
-                folder_path,
-                exp_idx,
-                hv_list,
-                log_hv_diff_list,
-                train_X,
-                train_Y
-            )
+            try:
+                hv_list, log_hv_diff_list, train_X, train_Y = mobo_full_loop(
+                    objective_func,
+                    acq_type,
+                    fixed_train_X,
+                    fixed_train_Y,
+                    bounds,
+                    num_iterations
+                )
+            except Exception as e:
+                print(f"Error during optimization: {e}")
+                continue
         else:
             # Run LMAMOO
-            hv_list, log_hv_diff_list, train_X, train_Y, acq_type_list, messages = lm_assisted_adaptive_moo(
-                objective_func,
-                fixed_train_X,
-                fixed_train_Y,
-                bounds,
-                num_iterations
-            )
-            
-            save_results(
-                folder_path,
-                exp_idx,
-                hv_list,
-                log_hv_diff_list,
-                train_X,
-                train_Y
-            )
-            # save both acq_type_list and messages
-            with open(f"{folder_path}/{exp_idx}_acq_types.txt", "w") as f1, \
-                open(f"{folder_path}/{exp_idx}_messages.txt", "w") as f2:
-                f1.write("\n".join(acq_type_list))
-                f2.write("\n".join(messages))
+            try:
+                hv_list, log_hv_diff_list, train_X, train_Y, acq_type_list, messages = lm_assisted_adaptive_moo(
+                    objective_func,
+                    fixed_train_X,
+                    fixed_train_Y,
+                    bounds,
+                    num_iterations
+                )
+                # save both acq_type_list and messages
+                with open(f"{folder_path}/{exp_idx}_acq_types.txt", "w") as f1, \
+                    open(f"{folder_path}/{exp_idx}_messages.txt", "w") as f2:
+                    f1.write("\n".join(acq_type_list))
+                    f2.write("\n".join(messages))
+            except Exception as e:
+                print(f"Error during LMAMOO: {e}")
+                continue
+        save_results(
+            folder_path,
+            exp_idx,
+            hv_list,
+            log_hv_diff_list,
+            train_X,
+            train_Y
+        )
+        del fixed_train_X, fixed_train_Y, hv_list, log_hv_diff_list, train_X, train_Y
 
 if __name__=="__main__":
     argparser = argparse.ArgumentParser()
@@ -109,17 +111,9 @@ if __name__=="__main__":
         default="bo",
         help="Whether to run BO or LMABO",
     )
-    argparser.add_argument(
-        "--plot_flag",
-        action="store_true",
-        help="Plot the results after running the optimization"
-    )
     args = argparser.parse_args()
     if args.method == "moo":
         for acq_type in moo_acq_type_mapping.keys():
             run_problem(args.problem, acq_type)
     elif args.method == "lmamoo":
         run_problem(args.problem, "lmamoo")
-    if args.plot_flag:
-        plot_results(args.problem, "hv")
-        plot_results(args.problem, "log_hv_diff")

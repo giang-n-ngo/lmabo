@@ -119,7 +119,7 @@ class QwenChatbot:
         inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
         response_ids = self.model.generate(
             **inputs, 
-            max_new_tokens=32768,
+            max_new_tokens=4096,
             use_cache=True,  # Enable KV caching
             pad_token_id=self.tokenizer.eos_token_id
         )[0][len(inputs.input_ids[0]):].tolist()

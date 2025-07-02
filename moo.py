@@ -56,13 +56,7 @@ from botorch.test_functions.multi_objective import (
     ZDT3,
     DTLZ1,
     DTLZ2,
-    DTLZ5,
     BraninCurrin,
-    DH1,
-    DH2,
-    DH3,
-    DH4,
-    GMM,
     Penicillin,
     VehicleSafety,
     CarSideImpact
@@ -80,8 +74,6 @@ tkwargs = {
 
 NUM_RESTARTS = 10
 RAW_SAMPLES = 512
-NOISE_SE = 0.1
-BETA = 1
 MC_SAMPLES = 128
 MAX_CHOLESKY_SIZE = float('inf')
 
@@ -117,6 +109,18 @@ MOO_TEST_CONFIGS = {
     "DTLZ1": {"dim": 10, "num_objectives": 4},  
     "DTLZ2": {"dim": 10, "num_objectives": 4},  
     "DTLZ5": {"dim": 10, "num_objectives": 4},  
+}
+
+MOO_NUM_ITERATIONS = {
+    "ZDT1": 20,
+    "ZDT2": 20,
+    "ZDT3": 50,
+    "DTLZ1": 50,
+    "DTLZ2": 200,
+    "BraninCurrin": 50,
+    "Penicillin": 200,
+    "VehicleSafety": 200,
+    "CarSideImpact": 200
 }
 
 def prepare_objective_func_moo(problem):
@@ -172,6 +176,34 @@ def get_moo_results(obj_values, ref_point, max_hv):
     log_hv_difference = np.log10(max_hv - hv)
     return hv, log_hv_difference
 
+def robust_sample_optimal_points(model, bounds, num_samples, num_points):
+    """Sample Pareto points with fallback mechanisms."""
+    try:
+        ps, pf = sample_optimal_points(
+            model=model,
+            bounds=bounds,
+            num_samples=num_samples,
+            num_points=num_points,
+            optimizer=random_search_optimizer,
+            optimizer_kwargs={"pop_size": 500, "max_tries": 10},
+        )
+        
+        # Check if Pareto front is degenerate
+        if pf.std(dim=0).min() < 1e-6:
+            print("Warning: Degenerate Pareto front detected, using random points")
+            # Generate diverse random points as fallback
+            ps = torch.rand(num_samples, num_points, bounds.shape[1], **tkwargs)
+            pf = model.posterior(ps.view(-1, bounds.shape[1])).mean.view(num_samples, num_points, -1)
+        
+        return ps, pf
+        
+    except Exception as e:
+        print(f"Pareto sampling failed: {e}, using random fallback")
+        # Fallback to random sampling
+        ps = torch.rand(num_samples, num_points, bounds.shape[1], **tkwargs)
+        pf = model.posterior(ps.view(-1, bounds.shape[1])).mean.view(num_samples, num_points, -1)
+        return ps, pf
+
 def mobo_single_iteration(
     train_X: Tensor,
     train_Y: Tensor,
@@ -221,21 +253,16 @@ def mobo_single_iteration(
             model=model,
             ref_point=objective_func.ref_point,
             num_fantasies=16,
+            num_pareto=10
         )
     elif "ES" in acq_type:
-        num_pareto_samples = 6
-        num_pareto_points = 6
-        optimizer_kwargs = {
-            "pop_size": 500,
-            "max_tries": 10,
-        }
-        ps, pf = sample_optimal_points(
+        num_pareto_samples = 8
+        num_pareto_points = 8
+        ps, pf = robust_sample_optimal_points(
             model=model,
             bounds=standard_bounds,
             num_samples=num_pareto_samples,
             num_points=num_pareto_points,
-            optimizer=random_search_optimizer,
-            optimizer_kwargs=optimizer_kwargs,
         )
         hypercell_bounds = compute_sample_box_decomposition(pf)
         if acq_type == 'qLBMOJES':
@@ -289,15 +316,19 @@ def mobo_single_iteration(
             "bounds": standard_bounds,
             "q": 1,
             "num_restarts": 4,
-            "raw_samples": 512
         }
         if acq_type == "qMOPES":
             new_x, _ = optimize_acqf(
+                raw_samples=128,
                 options={"with_grad": False},
                 **optimize_acqf_kwargs
             )
         else:
-            new_x, _ = optimize_acqf(sequential=True, **optimize_acqf_kwargs)
+            new_x, _ = optimize_acqf(
+                sequential=True, 
+                raw_samples=512
+                **optimize_acqf_kwargs
+            )
     new_x = unnormalize(new_x, bounds)
     # Get new observations
     new_y = objective_func(new_x)
