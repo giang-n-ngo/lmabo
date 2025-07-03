@@ -5,11 +5,9 @@ from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
 
 INITIAL_PROMPT_CONTENT = """
-You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. 
-Your goal is to advise on the optimal strategy to efficiently find the global minimum of a black-box function.
+You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration to minimize an objective function.
 
-We use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD. 
-Prefer exploration in the early iterations and exploitation in the later ones, but always consider the current state of the optimization process.
+For context, we use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD.
 
 I will provide you with a summary of the Bayesian Optimization process at each step. This summary will include the following information:
 - **N:** The total number of points evaluated so far.
@@ -143,7 +141,9 @@ class LanguageModelAssistedAdaptiveBO:
             self.best_values.append(self.train_Y.min().item())
             print(f"Current best value: {self.train_Y.min().item()}")
             self.remaining_iterations -= 1
-        self.convo.last_guess()
+        self.convo.last_guess(FINAL_GUESS)  
+        messages = self.convo.messages
+        del self.convo # free memory
         return (
             np.array(self.best_values) - self.objective_func._optimal_value, # simple regret
             calculate_cumulative_regret(
@@ -153,5 +153,5 @@ class LanguageModelAssistedAdaptiveBO:
             np.array(self.train_X.detach().cpu().numpy()), 
             np.array(self.train_Y.detach().cpu().numpy()).flatten(),
             self.acq_type_list,
-            self.convo.messages
+            messages
         )

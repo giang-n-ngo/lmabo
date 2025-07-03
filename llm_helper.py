@@ -1,14 +1,9 @@
-import os
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # Suppress warnings
 import random
 import re
 import time
-import torch
-torch.backends.cudnn.benchmark = True
-torch.backends.cuda.matmul.allow_tf32 = True
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from vllm import LLM, SamplingParams
 
 from key import API_KEYS
 
@@ -88,49 +83,132 @@ def configure_and_start_chat_api(first_prompt):
 
 class QwenChatbot:
     def __init__(self, model_name):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,    
-            torch_dtype="auto",
-            device_map="auto"
+        """
+        Initialize the chatbot with vLLM.
+        
+        Args:
+            model_name: Hugging Face model name/path
+        """
+        print(f"Loading model: {model_name}")
+        
+        # Initialize vLLM with optimized settings
+        self.llm = LLM(
+            model=model_name,
+            gpu_memory_utilization=0.3,  # Use 80% of GPU memory
+            max_model_len=4096,          # Maximum sequence length
+            dtype="float16",             # Use half precision for efficiency
+            trust_remote_code=True,      # Required for some models
+            tensor_parallel_size=1,      # Number of GPUs (set to 1 for single GPU)
         )
+        
+        # Sampling parameters for generation
+        self.sampling_params = SamplingParams(
+            temperature=0.0,             # Controls randomness (0.0 = deterministic)
+            top_p=0.9,                   # Nucleus sampling
+            max_tokens=2048,              # Maximum tokens to generate
+            repetition_penalty=1.1,      # Reduce repetition
+        )
+        
+        # Get tokenizer for special tokens
+        self.tokenizer = self.llm.get_tokenizer()
+        
+        # Update sampling params with proper stop tokens
+        self.sampling_params.stop_token_ids = [
+            self.tokenizer.eos_token_id,
+            self.tokenizer.convert_tokens_to_ids("<|im_end|>")  # Qwen's chat end token
+        ]
+        
+        # Conversation history
         self.history = []
+        
+        print("Model loaded successfully!")
+
+    def _format_chat_prompt(self, user_message):
+        """
+        Format the conversation history into a proper chat prompt for Qwen.
+        
+        Args:
+            user_message: New user message to add
+            
+        Returns:
+            Formatted prompt string
+        """
+        # Add the new user message to history
+        self.history.append({"role": "user", "content": user_message})
+        
+        # Build the chat prompt using Qwen's format
+        prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+        
+        for message in self.history:
+            role = message["role"]
+            content = message["content"]
+            prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+        
+        # Add assistant start token
+        prompt += "<|im_start|>assistant\n"
+        
+        return prompt
 
     def _clean_response(self, response_text):
-        """Remove <think> tags and their content from the response."""
+        """
+        Clean the generated response by removing unwanted tokens and formatting.
+        
+        Args:
+            response_text: Raw response from the model
+            
+        Returns:
+            Cleaned response text
+        """
         # Remove everything between <think> and </think> tags (including newlines)
         cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
         # Remove any remaining <think> or </think> tags
         cleaned = re.sub(r'</?think>', '', cleaned)
-        # Clean up extra whitespace but preserve structure
+        # Clean up extra whitespace
         cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
-        return cleaned.strip()
+        cleaned = cleaned.strip()
+        return cleaned
+    
+    def generate_response(self, user_message):
+        """
+        Generate a response to the user message.
+        
+        Args:
+            user_message: User's input message
+            
+        Returns:
+            Assistant's response
+        """
+        try:
+            # Format the prompt with conversation history
+            prompt = self._format_chat_prompt(user_message)
+            
+            # Generate response using vLLM
+            outputs = self.llm.generate([prompt], self.sampling_params)
+            
+            # Extract the generated text
+            response = outputs[0].outputs[0].text
+            
+            # Clean the response
+            cleaned_response = self._clean_response(response)
+            
+            # Add assistant response to conversation history
+            self.history.append({"role": "assistant", "content": cleaned_response})
+            
+            return cleaned_response
+            
+        except Exception as e:
+            error_msg = f"Error generating response: {str(e)}"
+            print(error_msg)
+            return error_msg
+    
+    def reset_conversation(self):
+        """Reset the conversation history."""
+        self.history = []
+        print("Conversation history cleared.")
 
-    @torch.inference_mode()
-    def generate_response(self, user_input):
-        messages = self.history + [{"role": "user", "content": user_input}]
-
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-
-        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
-        response_ids = self.model.generate(
-            **inputs, 
-            max_new_tokens=4096,
-            use_cache=True,  # Enable KV caching
-            pad_token_id=self.tokenizer.eos_token_id
-        )[0][len(inputs.input_ids[0]):].tolist()
-        response = self.tokenizer.decode(response_ids, skip_special_tokens=True)
-        cleaned_response = self._clean_response(response)
-
-        # Update history
-        self.history.append({"role": "user", "content": user_input})
-        self.history.append({"role": "assistant", "content": cleaned_response})
-
-        return cleaned_response
+    def get_history(self):
+        """Get the current conversation history."""
+        return self.history.copy()
 
 def configure_and_start_chat_ops(first_prompt):
     # Load Qwen3 model and tokenizer from Hugging Face Hub
