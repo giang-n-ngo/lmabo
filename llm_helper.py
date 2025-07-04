@@ -224,13 +224,12 @@ class QwenChatbot:
             return cleaned_response
             
         except Exception as e:
-            error_msg = f"Error generating response: {str(e)}"
             print(f"Full error details: {type(e).__name__}: {e}")
             if self.hosted:
                 print("Hosted mode connection failed. Check if vLLM server is running on localhost:8000")
             else:
                 print("Local vLLM generation failed. Check GPU availability and memory.")
-            return error_msg
+            exit()
     
     def reset_conversation(self):
         """Reset the conversation history."""
