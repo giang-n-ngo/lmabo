@@ -81,6 +81,7 @@ def run_problem(
     problem,
     acq_type=None, 
     starting_exp_idx=0,
+    server_node="localhost"  # Default to localhost if not specified
 ):
     print(f"Running {acq_type} on {device}")
     # Experiment setup
@@ -115,7 +116,8 @@ def run_problem(
                 fixed_train_Y, 
                 bounds, 
                 num_iterations,
-                llm
+                llm,
+                server_node,
             )
             # optimize and get results
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
@@ -159,6 +161,8 @@ def parse_arguments():
     parser.add_argument("--method", type=str, default="bo",
                        choices=["bo", "lmabo", "lmabo-ops", "gphedge"],
                        help="Optimization method to use")
+    parser.add_argument("--server_node", type=str, default="localhost",
+                       help="Server node for vLLM serving (if applicable)")
     parser.add_argument("--starting_exp_idx", type=int, default=0,
                        help="Starting experiment index")
     return parser.parse_args()
@@ -170,4 +174,4 @@ if __name__=="__main__":
         for acq_type in acq_type_mapping.keys():
             run_problem(args.problem, acq_type, starting_exp_idx)
     else:
-        run_problem(args.problem, args.method, starting_exp_idx) 
+        run_problem(args.problem, args.method, starting_exp_idx, args.server_node) 

@@ -45,6 +45,7 @@ Your justification should briefly explain why that function is suitable given th
 The response should be in the format "Acquisition abbreviation: justification", similar to these examples:
 - 'qKG: This is a good choice because ...'
 - 'EI: This is chosen given the current state of the optimization since ...'
+Firstly, just give a brief confirmation that you understand the task and the available acquisition functions.
 """
 
 FOLLOW_UP_PROMPT_TEMPLATE = """
@@ -71,7 +72,8 @@ class LanguageModelAssistedAdaptiveBO:
         Y_init,
         bounds,
         num_iterations,
-        llm="api"
+        llm="api",
+        server_node="localhost"
     ):
         self.objective_func = objective_func
         self.train_X  = X_init.clone()
@@ -89,7 +91,8 @@ class LanguageModelAssistedAdaptiveBO:
         self.convo = ConversationHolder(
             llm, 
             first_prompt=INITIAL_PROMPT_CONTENT, 
-            full_acq_type_list=list(acq_type_mapping.keys())
+            full_acq_type_list=list(acq_type_mapping.keys()),
+            server_node=server_node
         )
 
     def _construct_prompt(self):

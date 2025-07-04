@@ -3,6 +3,7 @@ import re
 import time
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
+from openai import OpenAI
 from vllm import LLM, SamplingParams
 
 from key import API_KEYS
@@ -82,41 +83,53 @@ def configure_and_start_chat_api(first_prompt):
         exit() # Exit if we can't even start the chat    
 
 class QwenChatbot:
-    def __init__(self, model_name):
+    def __init__(self, model_name, hosted=False, server_node="localhost"):
         """
         Initialize the chatbot with vLLM.
         
         Args:
             model_name: Hugging Face model name/path
         """
+        self.hosted = hosted
+        self.max_tokens = 4096  # Maximum tokens for generation
+        self.top_p = 0.9  # Nucleus sampling probability
         print(f"Loading model: {model_name}")
-        
-        # Initialize vLLM with optimized settings
-        self.llm = LLM(
-            model=model_name,
-            gpu_memory_utilization=0.3,  # Use 80% of GPU memory
-            max_model_len=4096,          # Maximum sequence length
-            dtype="float16",             # Use half precision for efficiency
-            trust_remote_code=True,      # Required for some models
-            tensor_parallel_size=1,      # Number of GPUs (set to 1 for single GPU)
-        )
-        
-        # Sampling parameters for generation
-        self.sampling_params = SamplingParams(
-            temperature=0.0,             # Controls randomness (0.0 = deterministic)
-            top_p=0.9,                   # Nucleus sampling
-            max_tokens=2048,              # Maximum tokens to generate
-            repetition_penalty=1.1,      # Reduce repetition
-        )
-        
-        # Get tokenizer for special tokens
-        self.tokenizer = self.llm.get_tokenizer()
-        
-        # Update sampling params with proper stop tokens
-        self.sampling_params.stop_token_ids = [
-            self.tokenizer.eos_token_id,
-            self.tokenizer.convert_tokens_to_ids("<|im_end|>")  # Qwen's chat end token
-        ]
+        if hosted:
+            openai_api_key = "EMPTY"
+            openai_api_base = f"http://{server_node}:8000/v1"
+
+            self.client = OpenAI(
+                api_key=openai_api_key,
+                base_url=openai_api_base,
+            )
+            print("Using hosted vLLM API at localhost:8000")
+        else:
+            # Initialize vLLM with optimized settings
+            self.llm = LLM(
+                model=model_name,
+                gpu_memory_utilization=0.3,  # Use 80% of GPU memory
+                max_model_len=16384,         # Maximum sequence length
+                dtype="float16",             # Use half precision for efficiency
+                trust_remote_code=True,      # Required for some models
+                tensor_parallel_size=1,      # Number of GPUs (set to 1 for single GPU)
+            )
+            
+            # Sampling parameters for generation
+            self.sampling_params = SamplingParams(
+                temperature=0.0,             # Controls randomness (0.0 = deterministic)
+                top_p=self.top_p,                   # Nucleus sampling
+                max_tokens=self.max_tokens,              # Maximum tokens to generate
+                repetition_penalty=1.1,      # Reduce repetition
+            )
+            
+            # Get tokenizer for special tokens
+            self.tokenizer = self.llm.get_tokenizer()
+            
+            # Update sampling params with proper stop tokens
+            self.sampling_params.stop_token_ids = [
+                self.tokenizer.eos_token_id,
+                self.tokenizer.convert_tokens_to_ids("<|im_end|>")  # Qwen's chat end token
+            ]
         
         # Conversation history
         self.history = []
@@ -182,11 +195,25 @@ class QwenChatbot:
             # Format the prompt with conversation history
             prompt = self._format_chat_prompt(user_message)
             
-            # Generate response using vLLM
-            outputs = self.llm.generate([prompt], self.sampling_params)
-            
-            # Extract the generated text
-            response = outputs[0].outputs[0].text
+            if self.hosted:
+                # call the client API for hosted models
+                outputs = self.client.chat.completions.create(
+                    model="Qwen/Qwen3-8B",
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=0.0,
+                    top_p=self.top_p,
+                    extra_body={
+                        "top_k": 20,
+                    },
+                )
+                response = outputs.choices[0].message.content
+            else:
+                # Generate response using vLLM
+                outputs = self.llm.generate([prompt], self.sampling_params)
+                response = outputs[0].outputs[0].text
             
             # Clean the response
             cleaned_response = self._clean_response(response)
@@ -198,7 +225,11 @@ class QwenChatbot:
             
         except Exception as e:
             error_msg = f"Error generating response: {str(e)}"
-            print(error_msg)
+            print(f"Full error details: {type(e).__name__}: {e}")
+            if self.hosted:
+                print("Hosted mode connection failed. Check if vLLM server is running on localhost:8000")
+            else:
+                print("Local vLLM generation failed. Check GPU availability and memory.")
             return error_msg
     
     def reset_conversation(self):
@@ -210,9 +241,9 @@ class QwenChatbot:
         """Get the current conversation history."""
         return self.history.copy()
 
-def configure_and_start_chat_ops(first_prompt):
+def configure_and_start_chat_ops(first_prompt, server_node="localhost"):
     # Load Qwen3 model and tokenizer from Hugging Face Hub
-    chatbot = QwenChatbot(model_name="Qwen/Qwen3-8B")
+    chatbot = QwenChatbot(model_name="Qwen/Qwen3-8B", hosted=True, server_node=server_node)
     print("Initialized Qwen3")
     # Start a conversation
     response = chatbot.generate_response(first_prompt)
@@ -224,7 +255,8 @@ class ConversationHolder:
         self,
         llm="api",
         first_prompt="",
-        full_acq_type_list=[]
+        full_acq_type_list=[],
+        server_node="localhost"  # Default to localhost if not specified
     ):
         self.llm = llm
         self.full_acq_type_list = full_acq_type_list
@@ -236,7 +268,7 @@ class ConversationHolder:
             self.api_max_entries = 10
             self.api_max_delay_seconds = 120
         elif self.llm == "ops":
-            self.chatbot = configure_and_start_chat_ops(first_prompt)
+            self.chatbot = configure_and_start_chat_ops(first_prompt, server_node)
             self.messages.append(self.chatbot.history[-1]["content"])
         self.default_af = "UCB"
 
