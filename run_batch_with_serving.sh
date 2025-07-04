@@ -18,15 +18,15 @@ echo "vLLM server is running on node: $SERVER_NODE"
 # Define the problems and algorithms
 ## Main problems
 problems=(
-    "Ackley" "Beale" "Branin" "Bukin" "Cosine8" 
-    # "DixonPrice" "DropWave" "EggHolder" "Griewank" 
+    # "Ackley" "Beale" "Branin" "Bukin" "Cosine8" 
+    "DixonPrice" "DropWave" "EggHolder" "Griewank" 
     # "Hartmann" "HolderTable" "Levy" "Michalewicz" "Powell" 
     # "Rastrigin" "Rosenbrock" "Shekel" "SixHumpCamel" "StyblinskiTang" 
     # "Sphere" "BucheRastrigin" "LinearSlope" "AttractiveSector" 
     # "StepEllipsoid" "RosenbrockRotated" "Ellipsoid2" "Discus" "BentCigar" 
     # "SharpRidge" "DifferentPowers" "Weierstrass" "Schaffers" 
     # "SchaffersIllCond" "CompositeGriewankRosenbrock" "Schwefel" "Gallagher21" 
-    "Gallagher101" "Katsuura" "LunacekBiRastrigin" "Easom" 
+    # "Gallagher101" "Katsuura" "LunacekBiRastrigin" "Easom" 
 )
 
 # Loop over each problem and algorithm
