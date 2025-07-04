@@ -1,4 +1,12 @@
 from botorch.test_functions import *
+from botorch.test_functions.synthetic import (
+    ConstrainedGramacy,
+    PressureVessel,
+    WeldedBeamSO,
+    TensionCompressionString,
+    SpeedReducer,
+    KeaneBumpFunction
+)
 from test_functions.test_functions import *
 
 FIG_DIR = "figures" 
@@ -84,4 +92,14 @@ DIMS = {
     Rastrigin: 23,
     Rosenbrock: 24,
     StyblinskiTang: 21,
+    KeaneBumpFunction: 5,
 }
+
+CONSTRAINED_OBJECTIVE_FUNCTIONS = [
+    ConstrainedGramacy, # 2D 2 constraints
+    PressureVessel, # 4D 4 constraints
+    WeldedBeamSO, # 4D 6 constraints
+    TensionCompressionString, # 3D 4 constraints
+    SpeedReducer, # 7D 11 constraints
+    KeaneBumpFunction # 5D 2 constraints
+]

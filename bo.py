@@ -18,7 +18,10 @@ from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.max_value_entropy_search import qLowerBoundMaxValueEntropy
 from botorch.acquisition.utils import get_optimal_samples
 from botorch.generation import MaxPosteriorSampling
-from botorch.optim import optimize_acqf
+from botorch.optim import (
+    optimize_acqf,
+    optimize_acqf_discrete
+)
 from botorch.models.transforms import Normalize, Standardize
 from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
@@ -71,6 +74,30 @@ def prepare_objective_func(problem):
         objective_func._optimal_value = -8.8
     return objective_func, dim, bounds
 
+def prepare_objective_func_constrained(problem):
+    for item in CONSTRAINED_OBJECTIVE_FUNCTIONS:
+        if item.__name__ == problem:
+            f = item
+            break
+        elif hasattr(item, "name") and item.name == problem:
+            f = item
+            break
+    dim = 0
+    if f in DIMS:  
+        dim = DIMS[f]
+        objective_func = f(dim=dim).to(dtype=dtype, device=device)
+    else:
+        dim = f.dim
+        objective_func = f().to(dtype=dtype, device=device)
+    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
+    def constraint_func(X):
+        """
+        Evaluate the constraints at the given input X.
+        Returns a tensor of shape [num_samples, num_constraints].
+        """
+        return objective_func.evaluate_slack(X).to(dtype=dtype, device=device).squeeze(-1)
+    return objective_func, constraint_func, dim, bounds
+
 def calculate_auc_simple_regret(best_values, true_minimum):
     """
     Calculate the AUC of the simple regret curve for a minimization problem.
@@ -121,6 +148,29 @@ def fit_gp(X, Y):
     mll = ExactMarginalLogLikelihood(gp.likelihood, gp)
     fit_gpytorch_mll(mll)
     return gp
+
+def fit_gp_list(X, Y_list):
+    """
+    Fit a list of GPs for each output in Y_list.
+    This is useful for multi-output problems.
+    """
+    gplist = []
+    for i, Y in enumerate(Y_list):
+        gp = SingleTaskGP(
+            X, 
+            Y, 
+            covar_module=ScaleKernel(
+                MaternKernel(
+                    ard_num_dims=X.shape[-1]
+                )
+            ), 
+            input_transform=Normalize(d=X.shape[-1]),
+            outcome_transform=Standardize(m=1)
+        )
+        mll = ExactMarginalLogLikelihood(gp.likelihood, gp)
+        fit_gpytorch_mll(mll)
+        gplist.append(gp)
+    return gplist
 
 def _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip):
     if acq_type == "PI":
@@ -354,4 +404,91 @@ def gp_hedge_full_loop(
         np.array(train_Y.detach().cpu().numpy()).flatten(),
         np.array(acquisition_function_weights_history), # Return weights history
         acq_type_list
+    )
+
+def bo_constrained_singple_iteration(
+    objective_func,
+    constraint_func,
+    acq_type,
+    bounds,
+    train_X,
+    train_Y,
+    train_constraints,
+    all_candidates
+):
+    # fit main objective GP
+    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
+        flip = -1
+    else:
+        flip = 1
+    gp = fit_gp(train_X, train_Y*flip)
+    # fit constraint GPs
+    constraint_gps = fit_gp_list(train_X, [train_constraints[:, i] for i in range(train_constraints.shape[1])])
+    # Prepare acquisition function
+    acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
+    # Choose feasible candidates based on lower confidence bound of constraints
+    lcb_list = []
+    beta_t = 10*math.log(train_Y.shape[0])
+    for constraint_gp in constraint_gps:
+        # Get lower confidence bound for the constraint
+        lcb = constraint_gp.posterior(all_candidates).mean - beta_t * constraint_gp.posterior(all_candidates).variance.sqrt()
+        lcb_list.append(lcb.squeeze(-1))
+    lcb_list = torch.stack(lcb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
+    # Filter candidates that satisfy all constraints
+    feasible_candidates = all_candidates[(lcb_list <= 0).all(dim=-1)]
+    if feasible_candidates.size(0) == 0:
+        # sample a random number of feasible candidates from the original candidates
+        feasible_candidates = all_candidates[torch.randperm(all_candidates.size(0))[:1000]]
+        print("No feasible candidates found in the current batch, sampling from all candidates.")
+    # Optimize the acquisition function to find the next query point
+    candidate, _ = optimize_acqf_discrete(
+        acq_func, 
+        q=1,
+        choices=feasible_candidates,
+    )
+    # Evaluate the function and the constraints at the new point
+    new_Y = objective_func(candidate).unsqueeze(-1)
+    new_constraints = constraint_func(candidate).unsqueeze(-1)
+    # Update the dataset
+    train_X = torch.cat([train_X, candidate])
+    train_Y = torch.cat([train_Y, new_Y])
+    train_constraints = torch.cat([train_constraints, new_constraints], dim=0)
+    return train_X, train_Y, train_constraints, gp, constraint_gps
+
+def bo_constrained_full_loop(
+    objective_func,
+    constraint_func,
+    acq_type,
+    bounds,
+    X_init,
+    Y_init,
+    train_constraints_init,
+    num_iterations,
+    all_candidates
+):
+    """
+    Runs the full Bayesian Optimization loop for a constrained optimization problem.
+    """
+    # Generate initial training data
+    train_X = X_init.clone()
+    train_Y = Y_init.clone()
+    train_constraints = train_constraints_init.clone()
+    
+    for iteration_idx in range(num_iterations):
+        train_X, train_Y, train_constraints, _, _ = bo_constrained_singple_iteration(
+            objective_func,
+            constraint_func,
+            acq_type,
+            bounds,
+            train_X,
+            train_Y,
+            train_constraints,
+            all_candidates
+        )
+        print(f"Iter {iteration_idx} | Current best value: {train_Y.min().item()}")
+    
+    return (
+        np.array(train_X.detach().cpu().numpy()), 
+        np.array(train_Y.detach().cpu().numpy()).flatten(),
+        np.array(train_constraints.detach().cpu().numpy())
     )

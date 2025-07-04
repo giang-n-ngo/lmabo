@@ -29,7 +29,7 @@ from botorch.acquisition.multi_objective.max_value_entropy_search import (
 from botorch.acquisition.multi_objective.predictive_entropy_search import (
     qMultiObjectivePredictiveEntropySearch
 )
-from botorch.optim.optimize import optimize_acqf
+from botorch.optim.optimize import optimize_acqf, optimize_acqf_discrete
 from botorch.utils.multi_objective.box_decompositions.dominated import (
     DominatedPartitioning,
 )
@@ -45,6 +45,7 @@ from botorch.exceptions.warnings import (
 from gpytorch.mlls.sum_marginal_log_likelihood import SumMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
 from torch import Tensor
+from torch.quasirandom import SobolEngine
 import torch
 import numpy as np
 import gpytorch
@@ -256,8 +257,8 @@ def mobo_single_iteration(
             num_pareto=10
         )
     elif "ES" in acq_type:
-        num_pareto_samples = 8
-        num_pareto_points = 8
+        num_pareto_samples = 16
+        num_pareto_points = 16
         ps, pf = robust_sample_optimal_points(
             model=model,
             bounds=standard_bounds,
@@ -324,11 +325,21 @@ def mobo_single_iteration(
                 **optimize_acqf_kwargs
             )
         else:
-            new_x, _ = optimize_acqf(
-                sequential=True, 
-                raw_samples=512
-                **optimize_acqf_kwargs
-            )
+            try:
+                new_x, _ = optimize_acqf(
+                    sequential=True, 
+                    raw_samples=512,
+                    **optimize_acqf_kwargs
+                )
+            except:
+                print("Sequential optimization failed, falling back to grid search")
+                sobol = SobolEngine(dimension=bounds.shape[1], scramble=True, seed=0)
+                candidates = sobol.draw(2048).to(**tkwargs)
+                new_x, _ = optimize_acqf_discrete(
+                    acq_function=acqf,
+                    q=1,
+                    choices=candidates
+                )
     new_x = unnormalize(new_x, bounds)
     # Get new observations
     new_y = objective_func(new_x)

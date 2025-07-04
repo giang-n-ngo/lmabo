@@ -131,7 +131,9 @@ def read_raw_result(problem, acq_type, result_type):
                 file_name = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}/{exp_idx}_{result_type}.npy"
             simple_regret = np.load(file_name)
             if np.isnan(simple_regret).any():
-                print(file_name)
+                print(f"Found nan value in {file_name}")
+                os.remove(file_name)  # Remove the file if it contains NaN values
+                continue
             raw_result.append(simple_regret)
         except FileNotFoundError:
             continue 
