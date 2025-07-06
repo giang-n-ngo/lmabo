@@ -1,5 +1,6 @@
 import numpy as np
 import torch
+import random
 from botorch.test_functions import *
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
@@ -16,8 +17,8 @@ from botorch.acquisition.knowledge_gradient import qKnowledgeGradient
 from botorch.acquisition.predictive_entropy_search import qPredictiveEntropySearch
 from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.max_value_entropy_search import qLowerBoundMaxValueEntropy
+from botorch.acquisition.thompson_sampling import PathwiseThompsonSampling
 from botorch.acquisition.utils import get_optimal_samples
-from botorch.generation import MaxPosteriorSampling
 from botorch.optim import (
     optimize_acqf,
     optimize_acqf_discrete
@@ -87,8 +88,13 @@ def prepare_objective_func_constrained(problem):
         dim = DIMS[f]
         objective_func = f(dim=dim).to(dtype=dtype, device=device)
     else:
-        dim = f.dim
-        objective_func = f().to(dtype=dtype, device=device)
+        if problem == "ConstrainedHartmann":
+            # Special case for Constrained Hartmann
+            objective_func = f(dim=6).to(dtype=dtype, device=device)
+            dim = 6
+        else:
+            dim = f.dim
+            objective_func = f().to(dtype=dtype, device=device)
     bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
     def constraint_func(X):
         """
@@ -218,7 +224,7 @@ def _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip):
             candidate_set=torch.rand(1000, bounds.size(1)).to(train_X.dtype).to(train_X.device),
         )
     elif acq_type == "TS":
-        acq_func = MaxPosteriorSampling(model=gp, replacement=False)
+        acq_func = PathwiseThompsonSampling(gp)
     else:
         raise ValueError("Invalid acquisition function type")    
     return acq_func
@@ -406,7 +412,28 @@ def gp_hedge_full_loop(
         acq_type_list
     )
 
-def bo_constrained_singple_iteration(
+def optimize_acqf_discrete_qKG(
+    bounds,
+    acq_function,
+    choices=None,
+    batch_size=256
+):
+    """
+    Optimize an acquisition function over a discrete set of choices.
+    This is a wrapper around the BoTorch optimize_acqf_discrete function.
+    """
+    if choices is None:
+        raise ValueError("choices must be provided for discrete optimization.")
+   
+    # Get acq value for each candidate in batch using for loop with a maximum batch_size
+    acq_values = torch.cat([acq_function.evaluate(X=X_, bounds=bounds) for X_ in choices.split(batch_size)])
+    # Find the candidate with the maximum acquisition value
+    max_idx = torch.argmax(acq_values)
+    candidate = choices[max_idx].unsqueeze(0)  # Get the candidate corresponding to
+    
+    return candidate
+
+def bo_constrained_single_iteration(
     objective_func,
     constraint_func,
     acq_type,
@@ -428,24 +455,32 @@ def bo_constrained_singple_iteration(
     acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
     # Choose feasible candidates based on lower confidence bound of constraints
     lcb_list = []
-    beta_t = 10*math.log(train_Y.shape[0])
+    beta_t_sqrt = (10*math.log(train_Y.shape[0]))**0.5
     for constraint_gp in constraint_gps:
         # Get lower confidence bound for the constraint
-        lcb = constraint_gp.posterior(all_candidates).mean - beta_t * constraint_gp.posterior(all_candidates).variance.sqrt()
+        lcb = constraint_gp.posterior(all_candidates).mean - beta_t_sqrt * constraint_gp.posterior(all_candidates).variance.sqrt()
         lcb_list.append(lcb.squeeze(-1))
     lcb_list = torch.stack(lcb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
     # Filter candidates that satisfy all constraints
     feasible_candidates = all_candidates[(lcb_list <= 0).all(dim=-1)]
     if feasible_candidates.size(0) == 0:
         # sample a random number of feasible candidates from the original candidates
-        feasible_candidates = all_candidates[torch.randperm(all_candidates.size(0))[:1000]]
+        selected_indices = random.sample(range(all_candidates.size(0)), 1000)
+        feasible_candidates = all_candidates[selected_indices, :]
         print("No feasible candidates found in the current batch, sampling from all candidates.")
     # Optimize the acquisition function to find the next query point
-    candidate, _ = optimize_acqf_discrete(
-        acq_func, 
-        q=1,
-        choices=feasible_candidates,
-    )
+    if acq_type == "qKG":
+        candidate = optimize_acqf_discrete_qKG(
+            bounds,
+            acq_func,
+            choices=feasible_candidates,
+        )
+    else:
+        candidate, _ = optimize_acqf_discrete(
+            acq_function=acq_func,
+            q=1,
+            choices=feasible_candidates,
+        )
     # Evaluate the function and the constraints at the new point
     new_Y = objective_func(candidate).unsqueeze(-1)
     new_constraints = constraint_func(candidate).unsqueeze(-1)
@@ -475,7 +510,7 @@ def bo_constrained_full_loop(
     train_constraints = train_constraints_init.clone()
     
     for iteration_idx in range(num_iterations):
-        train_X, train_Y, train_constraints, _, _ = bo_constrained_singple_iteration(
+        train_X, train_Y, train_constraints, _, _ = bo_constrained_single_iteration(
             objective_func,
             constraint_func,
             acq_type,
@@ -485,7 +520,8 @@ def bo_constrained_full_loop(
             train_constraints,
             all_candidates
         )
-        print(f"Iter {iteration_idx} | Current best value: {train_Y.min().item()}")
+        best_feasible_value = train_Y[(train_constraints >= 0).all(dim=1).squeeze(-1)].min().item() if (train_constraints >= 0).all(dim=1).squeeze(-1).any() else "Not found"
+        print(f"Iter {iteration_idx} | Current best feasible value: {best_feasible_value}")
     
     return (
         np.array(train_X.detach().cpu().numpy()), 

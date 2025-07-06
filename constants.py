@@ -4,7 +4,7 @@ from botorch.test_functions.synthetic import (
     PressureVessel,
     WeldedBeamSO,
     TensionCompressionString,
-    SpeedReducer,
+    ConstrainedHartmann,
     KeaneBumpFunction
 )
 from test_functions.test_functions import *
@@ -96,10 +96,10 @@ DIMS = {
 }
 
 CONSTRAINED_OBJECTIVE_FUNCTIONS = [
-    ConstrainedGramacy, # 2D 2 constraints
-    PressureVessel, # 4D 4 constraints
-    WeldedBeamSO, # 4D 6 constraints
+    ConstrainedGramacy, # 2D 2 constraints OK
+    KeaneBumpFunction, # 5D 2 constraints
+    PressureVessel, # 4D 4 constraints OK
+    ConstrainedHartmann, # 6D 1 constraints
     TensionCompressionString, # 3D 4 constraints
-    SpeedReducer, # 7D 11 constraints
-    KeaneBumpFunction # 5D 2 constraints
+    WeldedBeamSO, # 4D 6 constraints OK
 ]
