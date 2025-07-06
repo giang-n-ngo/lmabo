@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-large
 #SBATCH --gpus=1
-#SBATCH --time=24:00:00 
+#SBATCH --time=6:00:00 
 #SBATCH --mem=40GB
 #SBATCH --cpus-per-gpu=8
 #SBATCH --qos=batch-short
