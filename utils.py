@@ -298,7 +298,12 @@ def report_completion(
                 folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
             if not os.path.exists(folder_path):
                 count = 0
-            elif acq in ["lmabo", "lmamoo", "gphedge"]:
+            elif acq in [
+                "lmabo", 
+                "lmabo-ops",
+                "lmamoo", 
+                "gphedge"
+            ]:
                 count = len([f for f in os.listdir(folder_path) 
                             if f.endswith('.npy') or f.endswith('.txt')])
                 count = int(count//6)

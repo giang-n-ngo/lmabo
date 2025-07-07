@@ -30,7 +30,8 @@ if args.setting == "bo":
         "lmabo",
         "gphedge",
         "llmgp",
-        "llambo"
+        "llambo",
+        "lmabo-ops"
     ]
     excepted_acq_type_list = [
     ]
