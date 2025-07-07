@@ -128,6 +128,7 @@ elif args.setting == "constrained":
     ]
     excepted_acq_type_list = [
         # Add any methods to exclude from reporting
+        "lmabo"
     ]
     full_acq_type_list = active_acq_type_list + excepted_acq_type_list
 

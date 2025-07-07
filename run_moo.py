@@ -1,6 +1,5 @@
 from moo import (
     mobo_full_loop, 
-    moo_acq_type_mapping, 
     prepare_objective_func_moo, 
     MOO_NUM_ITERATIONS
 )
@@ -33,7 +32,7 @@ def save_results(folder_path, exp_idx, hv_list, log_hv_diff_list, train_X, train
     np.save(f"{folder_path}/{exp_idx}_train_X.npy", train_X)
     np.save(f"{folder_path}/{exp_idx}_train_Y.npy", train_Y)
 
-def run_problem(problem, acq_type=None):
+def run_problem(problem, acq_type):
     print(f"Running {acq_type}")
     # Prepare function
     objective_func, dim, bounds = prepare_objective_func_moo(problem)
@@ -106,14 +105,10 @@ if __name__=="__main__":
         help="Function name to run the optimization on",
     )
     argparser.add_argument(
-        "--method",
+        "--acq_type",
         type=str,
-        default="bo",
-        help="Whether to run BO or LMABO",
+        default="qNEHVI",
+        help="Which acquisition type to use for MOO",
     )
     args = argparser.parse_args()
-    if args.method == "moo":
-        for acq_type in moo_acq_type_mapping.keys():
-            run_problem(args.problem, acq_type)
-    elif args.method == "lmamoo":
-        run_problem(args.problem, "lmamoo")
+    run_problem(args.problem, args.acq_type)
