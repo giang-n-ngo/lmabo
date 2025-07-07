@@ -1,14 +1,10 @@
-import os
-os.environ["TRANSFORMERS_VERBOSITY"] = "error"  # Suppress warnings
 import random
 import re
 import time
-import torch
-torch.backends.cudnn.benchmark = True
-torch.backends.cuda.matmul.allow_tf32 = True
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from openai import OpenAI
+from vllm import LLM, SamplingParams
 
 from key import API_KEYS
 
@@ -87,54 +83,166 @@ def configure_and_start_chat_api(first_prompt):
         exit() # Exit if we can't even start the chat    
 
 class QwenChatbot:
-    def __init__(self, model_name):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_name)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name,    
-            torch_dtype="auto",
-            device_map="auto"
-        )
+    def __init__(self, model_name, hosted=False, server_node="localhost"):
+        """
+        Initialize the chatbot with vLLM.
+        
+        Args:
+            model_name: Hugging Face model name/path
+        """
+        self.hosted = hosted
+        self.max_tokens = 4096  # Maximum tokens for generation
+        self.top_p = 0.9  # Nucleus sampling probability
+        print(f"Loading model: {model_name}")
+        if hosted:
+            openai_api_key = "EMPTY"
+            openai_api_base = f"http://{server_node}:8000/v1"
+
+            self.client = OpenAI(
+                api_key=openai_api_key,
+                base_url=openai_api_base,
+            )
+            print("Using hosted vLLM API at localhost:8000")
+        else:
+            # Initialize vLLM with optimized settings
+            self.llm = LLM(
+                model=model_name,
+                gpu_memory_utilization=0.3,  # Use 80% of GPU memory
+                max_model_len=16384,         # Maximum sequence length
+                dtype="float16",             # Use half precision for efficiency
+                trust_remote_code=True,      # Required for some models
+                tensor_parallel_size=1,      # Number of GPUs (set to 1 for single GPU)
+            )
+            
+            # Sampling parameters for generation
+            self.sampling_params = SamplingParams(
+                temperature=0.0,             # Controls randomness (0.0 = deterministic)
+                top_p=self.top_p,                   # Nucleus sampling
+                max_tokens=self.max_tokens,              # Maximum tokens to generate
+                repetition_penalty=1.1,      # Reduce repetition
+            )
+            
+            # Get tokenizer for special tokens
+            self.tokenizer = self.llm.get_tokenizer()
+            
+            # Update sampling params with proper stop tokens
+            self.sampling_params.stop_token_ids = [
+                self.tokenizer.eos_token_id,
+                self.tokenizer.convert_tokens_to_ids("<|im_end|>")  # Qwen's chat end token
+            ]
+        
+        # Conversation history
         self.history = []
+        
+        print("Model loaded successfully!")
+
+    def _format_chat_prompt(self, user_message):
+        """
+        Format the conversation history into a proper chat prompt for Qwen.
+        
+        Args:
+            user_message: New user message to add
+            
+        Returns:
+            Formatted prompt string
+        """
+        # Add the new user message to history
+        self.history.append({"role": "user", "content": user_message})
+        
+        # Build the chat prompt using Qwen's format
+        prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+        
+        for message in self.history:
+            role = message["role"]
+            content = message["content"]
+            prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+        
+        # Add assistant start token
+        prompt += "<|im_start|>assistant\n"
+        
+        return prompt
 
     def _clean_response(self, response_text):
-        """Remove <think> tags and their content from the response."""
+        """
+        Clean the generated response by removing unwanted tokens and formatting.
+        
+        Args:
+            response_text: Raw response from the model
+            
+        Returns:
+            Cleaned response text
+        """
         # Remove everything between <think> and </think> tags (including newlines)
         cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
         # Remove any remaining <think> or </think> tags
         cleaned = re.sub(r'</?think>', '', cleaned)
-        # Clean up extra whitespace but preserve structure
+        # Clean up extra whitespace
         cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
-        return cleaned.strip()
+        cleaned = cleaned.strip()
+        return cleaned
+    
+    def generate_response(self, user_message):
+        """
+        Generate a response to the user message.
+        
+        Args:
+            user_message: User's input message
+            
+        Returns:
+            Assistant's response
+        """
+        try:
+            # Format the prompt with conversation history
+            prompt = self._format_chat_prompt(user_message)
+            
+            if self.hosted:
+                # call the client API for hosted models
+                outputs = self.client.chat.completions.create(
+                    model="Qwen/Qwen3-8B",
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=0.0,
+                    top_p=self.top_p,
+                    extra_body={
+                        "top_k": 20,
+                    },
+                )
+                response = outputs.choices[0].message.content
+            else:
+                # Generate response using vLLM
+                outputs = self.llm.generate([prompt], self.sampling_params)
+                response = outputs[0].outputs[0].text
+            
+            # Clean the response
+            cleaned_response = self._clean_response(response)
+            
+            # Add assistant response to conversation history
+            self.history.append({"role": "assistant", "content": cleaned_response})
+            
+            return cleaned_response
+            
+        except Exception as e:
+            print(f"Full error details: {type(e).__name__}: {e}")
+            if self.hosted:
+                print("Hosted mode connection failed. Check if vLLM server is running on localhost:8000")
+            else:
+                print("Local vLLM generation failed. Check GPU availability and memory.")
+            exit()
+    
+    def reset_conversation(self):
+        """Reset the conversation history."""
+        self.history = []
+        print("Conversation history cleared.")
 
-    @torch.inference_mode()
-    def generate_response(self, user_input):
-        messages = self.history + [{"role": "user", "content": user_input}]
+    def get_history(self):
+        """Get the current conversation history."""
+        return self.history.copy()
 
-        text = self.tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True
-        )
-
-        inputs = self.tokenizer(text, return_tensors="pt").to(self.model.device)
-        response_ids = self.model.generate(
-            **inputs, 
-            max_new_tokens=4096,
-            use_cache=True,  # Enable KV caching
-            pad_token_id=self.tokenizer.eos_token_id
-        )[0][len(inputs.input_ids[0]):].tolist()
-        response = self.tokenizer.decode(response_ids, skip_special_tokens=True)
-        cleaned_response = self._clean_response(response)
-
-        # Update history
-        self.history.append({"role": "user", "content": user_input})
-        self.history.append({"role": "assistant", "content": cleaned_response})
-
-        return cleaned_response
-
-def configure_and_start_chat_ops(first_prompt):
+def configure_and_start_chat_ops(first_prompt, server_node="localhost"):
     # Load Qwen3 model and tokenizer from Hugging Face Hub
-    chatbot = QwenChatbot(model_name="Qwen/Qwen3-8B")
+    chatbot = QwenChatbot(model_name="Qwen/Qwen3-8B", hosted=True, server_node=server_node)
     print("Initialized Qwen3")
     # Start a conversation
     response = chatbot.generate_response(first_prompt)
@@ -146,7 +254,8 @@ class ConversationHolder:
         self,
         llm="api",
         first_prompt="",
-        full_acq_type_list=[]
+        full_acq_type_list=[],
+        server_node="localhost"  # Default to localhost if not specified
     ):
         self.llm = llm
         self.full_acq_type_list = full_acq_type_list
@@ -158,7 +267,7 @@ class ConversationHolder:
             self.api_max_entries = 10
             self.api_max_delay_seconds = 120
         elif self.llm == "ops":
-            self.chatbot = configure_and_start_chat_ops(first_prompt)
+            self.chatbot = configure_and_start_chat_ops(first_prompt, server_node)
             self.messages.append(self.chatbot.history[-1]["content"])
         self.default_af = "UCB"
 

@@ -5,11 +5,9 @@ from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
 
 INITIAL_PROMPT_CONTENT = """
-You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration. 
-Your goal is to advise on the optimal strategy to efficiently find the global minimum of a black-box function.
+You are an expert in Bayesian Optimization, specifically tasked with recommending the most suitable acquisition function for the next iteration to minimize an objective function.
 
-We use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD. 
-Prefer exploration in the early iterations and exploitation in the later ones, but always consider the current state of the optimization process.
+For context, we use a Gaussian Process as the surrogate model with a Matern 5/2 kernel with ARD.
 
 I will provide you with a summary of the Bayesian Optimization process at each step. This summary will include the following information:
 - **N:** The total number of points evaluated so far.
@@ -47,6 +45,7 @@ Your justification should briefly explain why that function is suitable given th
 The response should be in the format "Acquisition abbreviation: justification", similar to these examples:
 - 'qKG: This is a good choice because ...'
 - 'EI: This is chosen given the current state of the optimization since ...'
+Firstly, just give a brief confirmation that you understand the task and the available acquisition functions.
 """
 
 FOLLOW_UP_PROMPT_TEMPLATE = """
@@ -73,7 +72,8 @@ class LanguageModelAssistedAdaptiveBO:
         Y_init,
         bounds,
         num_iterations,
-        llm="api"
+        llm="api",
+        server_node="localhost"
     ):
         self.objective_func = objective_func
         self.train_X  = X_init.clone()
@@ -91,7 +91,8 @@ class LanguageModelAssistedAdaptiveBO:
         self.convo = ConversationHolder(
             llm, 
             first_prompt=INITIAL_PROMPT_CONTENT, 
-            full_acq_type_list=list(acq_type_mapping.keys())
+            full_acq_type_list=list(acq_type_mapping.keys()),
+            server_node=server_node
         )
 
     def _construct_prompt(self):
@@ -143,7 +144,9 @@ class LanguageModelAssistedAdaptiveBO:
             self.best_values.append(self.train_Y.min().item())
             print(f"Current best value: {self.train_Y.min().item()}")
             self.remaining_iterations -= 1
-        self.convo.last_guess()
+        self.convo.last_guess(FINAL_GUESS)  
+        messages = self.convo.messages
+        del self.convo # free memory
         return (
             np.array(self.best_values) - self.objective_func._optimal_value, # simple regret
             calculate_cumulative_regret(
@@ -153,5 +156,5 @@ class LanguageModelAssistedAdaptiveBO:
             np.array(self.train_X.detach().cpu().numpy()), 
             np.array(self.train_Y.detach().cpu().numpy()).flatten(),
             self.acq_type_list,
-            self.convo.messages
+            messages
         )
