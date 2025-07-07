@@ -28,7 +28,6 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
 from torch.quasirandom import SobolEngine
 
-from test_functions import *
 from constants import *
 
 # Set device (use GPU if available)
@@ -88,13 +87,8 @@ def prepare_objective_func_constrained(problem):
         dim = DIMS[f]
         objective_func = f(dim=dim).to(dtype=dtype, device=device)
     else:
-        if problem == "ConstrainedHartmann":
-            # Special case for Constrained Hartmann
-            objective_func = f(dim=6).to(dtype=dtype, device=device)
-            dim = 6
-        else:
-            dim = f.dim
-            objective_func = f().to(dtype=dtype, device=device)
+        objective_func = f().to(dtype=dtype, device=device)
+        dim = objective_func.dim
     bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
     def constraint_func(X):
         """
@@ -450,7 +444,14 @@ def bo_constrained_single_iteration(
         flip = 1
     gp = fit_gp(train_X, train_Y*flip)
     # fit constraint GPs
-    constraint_gps = fit_gp_list(train_X, [train_constraints[:, i] for i in range(train_constraints.shape[1])])
+    constraint_gps = fit_gp_list(
+        train_X, 
+        [
+            train_constraints[:, i].reshape(
+                (train_constraints.shape[0], 1)
+            ) for i in range(train_constraints.shape[1])
+        ]
+    )
     # Prepare acquisition function
     acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
     # Choose feasible candidates based on lower confidence bound of constraints
@@ -458,7 +459,8 @@ def bo_constrained_single_iteration(
     beta_t_sqrt = (10*math.log(train_Y.shape[0]))**0.5
     for constraint_gp in constraint_gps:
         # Get lower confidence bound for the constraint
-        lcb = constraint_gp.posterior(all_candidates).mean - beta_t_sqrt * constraint_gp.posterior(all_candidates).variance.sqrt()
+        lcb = constraint_gp.posterior(all_candidates).mean - \
+            beta_t_sqrt * constraint_gp.posterior(all_candidates).variance.sqrt()
         lcb_list.append(lcb.squeeze(-1))
     lcb_list = torch.stack(lcb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
     # Filter candidates that satisfy all constraints
@@ -520,7 +522,10 @@ def bo_constrained_full_loop(
             train_constraints,
             all_candidates
         )
-        best_feasible_value = train_Y[(train_constraints >= 0).all(dim=1).squeeze(-1)].min().item() if (train_constraints >= 0).all(dim=1).squeeze(-1).any() else "Not found"
+        if (train_constraints >= 0).all(dim=1).squeeze(-1).any():
+            best_feasible_value = train_Y[(train_constraints >= 0).all(dim=1).squeeze(-1)].min().item()
+        else:
+            best_feasible_value = "Not found"
         print(f"Iter {iteration_idx} | Current best feasible value: {best_feasible_value}")
     
     return (
@@ -528,3 +533,4 @@ def bo_constrained_full_loop(
         np.array(train_Y.detach().cpu().numpy()).flatten(),
         np.array(train_constraints.detach().cpu().numpy())
     )
+

@@ -266,7 +266,8 @@ def report_ranking_summary(problem_result, result_type, acq_type_list=list(acq_t
 def report_completion(
     problems, 
     active_acq_type_list=list(acq_type_mapping.keys()), 
-    excepted_acq_type_list=[]
+    excepted_acq_type_list=[],
+    constrained=False
 ):
     """
     Print a table showing number of completed runs for each problem and acquisition type.
@@ -295,38 +296,24 @@ def report_completion(
                 folder_path = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp"
             else:
                 folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
-            if acq in ["lmabo", "lmamoo", "gphedge"]:
-                if not os.path.exists(folder_path):
-                    count = 0
-                else:
-                    count = len([f for f in os.listdir(folder_path) 
+            if not os.path.exists(folder_path):
+                count = 0
+            elif acq in ["lmabo", "lmamoo", "gphedge"]:
+                count = len([f for f in os.listdir(folder_path) 
                             if f.endswith('.npy') or f.endswith('.txt')])
                 count = int(count//6)
-                row += f"{count:^{acq_width}}|"
-                # Check if this acquisition type has all runs
-                if count < EXP_RUNS and acq not in excepted_acq_type_list:
-                    problem_complete = False
             elif acq == "llmgp" or acq == "llambo":
-                if not os.path.exists(folder_path):
-                    count = 0
-                else:
-                    count = len([f for f in os.listdir(folder_path) if f.endswith('.npy')])
+                count = len([f for f in os.listdir(folder_path) if f.endswith('.npy')])
                 count = int(count//3)
-                row += f"{count:^{acq_width}}|"     
-                # Check if this acquisition type has all runs
-                if count < EXP_RUNS and acq not in excepted_acq_type_list:
-                    problem_complete = False
             else:
-                if not os.path.exists(folder_path):
-                    count = 0
+                count = len([f for f in os.listdir(folder_path)])
+                if constrained:
+                    count = int(count//3)
                 else:
-                    count = len([f for f in os.listdir(folder_path) 
-                            if f.endswith('.npy') and not f.endswith('_acq_types.npy')])
-                count = int(count//4)
-                row += f"{count:^{acq_width}}|"
-                # Check if this acquisition type has all runs
-                if count < EXP_RUNS and acq not in excepted_acq_type_list:
-                    problem_complete = False
+                   count = int(count//4)
+            row += f"{count:^{acq_width}}|"
+            if count < EXP_RUNS and acq not in excepted_acq_type_list:
+                problem_complete = False
                 
         print(row)
         if problem_complete:
