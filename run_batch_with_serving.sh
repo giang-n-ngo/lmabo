@@ -28,7 +28,27 @@ echo "vLLM server is running on node: $SERVER_NODE"
     # "SchaffersIllCond" "CompositeGriewankRosenbrock" "Schwefel" "Gallagher21" 
     # "Gallagher101" "Katsuura" "LunacekBiRastrigin" "Easom" 
 # )
-problems=("Rosenbrock")
+problems=(
+    "BentCigar"
+    "Bukin"
+    "CompositeGriewankRosenbrock"
+    "DifferentPowers"
+    "Discus"
+    "DixonPrice"
+    # "Ellipsoid2"
+    # "Griewank"
+    # "Levy"
+    # "LinearSlope"
+    # "Powell"
+    # "Rastrigin"
+    # "RosenbrockRotated"
+    # "SchaffersIllCond"
+    # "Schwefel"
+    # "SharpRidge"
+    # "Sphere"
+    # "StepEllipsoid"
+    # "StyblinskiTang"
+)
 
 # Loop over each problem and algorithm
 for problem in "${problems[@]}"; do
