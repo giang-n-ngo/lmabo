@@ -1,10 +1,6 @@
 import random
 import re
 import time
-import google.generativeai as genai
-from google.api_core.exceptions import ResourceExhausted
-from openai import OpenAI
-from vllm import LLM, SamplingParams
 
 from key import API_KEYS
 
@@ -60,6 +56,8 @@ def get_valid_key():
         return valid_key
 
 def configure_and_start_chat_api(first_prompt):
+    import google.generativeai as genai
+    from google.api_core.exceptions import ResourceExhausted
     valid_key = get_valid_key()
     genai.configure(api_key=valid_key)
     # init LLM
@@ -95,6 +93,7 @@ class QwenChatbot:
         self.top_p = 0.9  # Nucleus sampling probability
         print(f"Loading model: {model_name}")
         if hosted:
+            from openai import OpenAI
             openai_api_key = "EMPTY"
             openai_api_base = f"http://{server_node}:8000/v1"
 
@@ -104,6 +103,7 @@ class QwenChatbot:
             )
             print("Using hosted vLLM API at localhost:8000")
         else:
+            from vllm import LLM, SamplingParams
             # Initialize vLLM with optimized settings
             self.llm = LLM(
                 model=model_name,

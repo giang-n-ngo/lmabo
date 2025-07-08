@@ -7,7 +7,6 @@ from bo import (
     prepare_objective_func_constrained
 )
 from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR
-from lmabo import LanguageModelAssistedAdaptiveBO
 
 import argparse
 import numpy as np
@@ -147,6 +146,7 @@ def run_problem(
         )
         acq_type_list, messages, weights = None, None, None
         if "lmabo" in acq_type:
+            from lmabo import LanguageModelAssistedAdaptiveBO
             if acq_type == "lmabo":
                 llm = "api"
             elif acq_type == "lmabo-ops":

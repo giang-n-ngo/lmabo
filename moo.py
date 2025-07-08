@@ -94,10 +94,10 @@ MOO_OBJECTIVE_FUNCTIONS = [
     ZDT3,
     DTLZ1,
     DTLZ2,
-    BraninCurrin,
-    Penicillin,
-    VehicleSafety,
-    CarSideImpact
+    BraninCurrin, # 2 objectives
+    Penicillin, # 3 objectives
+    VehicleSafety, # 3 objectives
+    CarSideImpact # 4 objectives
 ]
 
 MOO_TEST_CONFIGS = {
@@ -109,7 +109,6 @@ MOO_TEST_CONFIGS = {
     # DTLZ test suite 
     "DTLZ1": {"dim": 10, "num_objectives": 4},  
     "DTLZ2": {"dim": 10, "num_objectives": 4},  
-    "DTLZ5": {"dim": 10, "num_objectives": 4},  
 }
 
 MOO_NUM_ITERATIONS = {
