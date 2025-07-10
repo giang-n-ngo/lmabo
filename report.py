@@ -31,9 +31,9 @@ if args.setting == "bo":
         "gphedge",
         "llmgp",
         "llambo",
-        "lmabo-ops"
     ]
     excepted_acq_type_list = [
+        "lmabo-ops"
     ]
     full_acq_type_list = active_acq_type_list + excepted_acq_type_list
 
