@@ -1,6 +1,8 @@
 import random
 import re
 import time
+import google.generativeai as genai
+from google.api_core.exceptions import ResourceExhausted
 
 from key import API_KEYS
 
@@ -56,8 +58,6 @@ def get_valid_key():
         return valid_key
 
 def configure_and_start_chat_api(first_prompt):
-    import google.generativeai as genai
-    from google.api_core.exceptions import ResourceExhausted
     valid_key = get_valid_key()
     genai.configure(api_key=valid_key)
     # init LLM

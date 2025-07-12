@@ -47,7 +47,6 @@ from gpytorch.kernels import MaternKernel, ScaleKernel
 from torch import Tensor
 from torch.quasirandom import SobolEngine
 import torch
-import time
 import numpy as np
 import gpytorch
 import warnings
@@ -312,39 +311,14 @@ def mobo_single_iteration(
             sequential=True,
         )
     elif "ES" in acq_type:
-        if acq_type == "qMOPES":
-            start = time.time()
-            sobol = SobolEngine(dimension=bounds.shape[1], scramble=True, seed=0)
-            candidates = sobol.draw(256).to(**tkwargs)
-            new_x, _ = optimize_acqf_discrete(
-                acq_function=acqf,
-                q=1,
-                choices=candidates,
-                max_batch_size=64,
-            )
-            print(f"Discrete optimization took {time.time() - start:.2f} seconds")
-        else:
-            optimize_acqf_kwargs = {
-                "acq_function": acqf,
-                "bounds": standard_bounds,
-                "q": 1,
-                "num_restarts": 4,
-            }
-            try:
-                new_x, _ = optimize_acqf(
-                    sequential=True, 
-                    raw_samples=512,
-                    **optimize_acqf_kwargs
-                )
-            except:
-                print("Sequential optimization failed, falling back to grid search")
-                sobol = SobolEngine(dimension=bounds.shape[1], scramble=True, seed=0)
-                candidates = sobol.draw(2048).to(**tkwargs)
-                new_x, _ = optimize_acqf_discrete(
-                    acq_function=acqf,
-                    q=1,
-                    choices=candidates,
-                )
+        sobol = SobolEngine(dimension=bounds.shape[1], scramble=True, seed=0)
+        candidates = sobol.draw(256).to(**tkwargs)
+        new_x, _ = optimize_acqf_discrete(
+            acq_function=acqf,
+            q=1,
+            choices=candidates,
+            max_batch_size=64,
+        )
     new_x = unnormalize(new_x, bounds)
     # Get new observations
     new_y = objective_func(new_x)

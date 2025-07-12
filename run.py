@@ -228,7 +228,21 @@ def run_problem_constrained(
         acq_type_list, messages = None, None
         # run constrained BO
         if "lmabo" in acq_type:
-            pass
+            from lmabo import LanguageModelAssistedAdaptiveConstrainedBO
+            # run LMABO
+            LMABO = LanguageModelAssistedAdaptiveConstrainedBO(
+                objective_func, 
+                constraint_func,
+                fixed_train_X, 
+                fixed_train_Y, 
+                fixed_train_constraints,
+                all_candidates,
+                bounds, 
+                num_iterations,
+            )
+            # optimize and get results
+            train_X, train_Y, train_constraints, acq_type_list, messages = LMABO.optimize()
+            del LMABO
         else:
             train_X, train_Y, train_constraints = bo_constrained_full_loop(
                 objective_func,
@@ -278,11 +292,15 @@ if __name__=="__main__":
         if args.method == "bo":
             for acq_type in acq_type_mapping.keys():
                 run_problem_constrained(args.problem, acq_type, starting_exp_idx)
-        else:
+        elif args.method in ["lmabo", "lmabo-ops"]:
             run_problem_constrained(args.problem, args.method, starting_exp_idx)
+        elif args.method == "gphedge":
+            run_problem_constrained(args.problem, "gphedge", starting_exp_idx)
     else:
         if args.method == "bo":
             for acq_type in acq_type_mapping.keys():
                 run_problem(args.problem, acq_type, starting_exp_idx)
-        else:
-            run_problem(args.problem, args.method, starting_exp_idx) 
+        elif args.method in ["lmabo", "lmabo-ops"]:
+            run_problem(args.problem, args.method, starting_exp_idx, args.server_node) 
+        elif args.method == "gphedge":
+            run_problem(args.problem, "gphedge", starting_exp_idx)

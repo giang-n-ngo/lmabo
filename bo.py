@@ -427,21 +427,13 @@ def optimize_acqf_discrete_qKG(
     
     return candidate
 
-def bo_constrained_single_iteration(
-    objective_func,
-    constraint_func,
-    acq_type,
-    bounds,
+def fit_gp_constrained(
     train_X,
     train_Y,
     train_constraints,
-    all_candidates
+    flip
 ):
     # fit main objective GP
-    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
-        flip = -1
-    else:
-        flip = 1
     gp = fit_gp(train_X, train_Y*flip)
     # fit constraint GPs
     constraint_gps = fit_gp_list(
@@ -452,26 +444,48 @@ def bo_constrained_single_iteration(
             ) for i in range(train_constraints.shape[1])
         ]
     )
-    # Prepare acquisition function
-    acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
-    # Choose feasible candidates based on lower confidence bound of constraints
+    return gp, constraint_gps
+
+def get_feasible_candidates(
+    constraint_gps,
+    all_candidates,
+    beta_t_sqrt=10.0,
+    return_sampling_flag=False
+):
+    """
+    Get feasible candidates based on the lower confidence bound of the constraints.
+    """
     lcb_list = []
-    beta_t_sqrt = (10*math.log(train_Y.shape[0]))**0.5
     for constraint_gp in constraint_gps:
         # Get lower confidence bound for the constraint
         lcb = constraint_gp.posterior(all_candidates).mean - \
             beta_t_sqrt * constraint_gp.posterior(all_candidates).variance.sqrt()
         lcb_list.append(lcb.squeeze(-1))
     lcb_list = torch.stack(lcb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
+    
     # Filter candidates that satisfy all constraints
     feasible_candidates = all_candidates[(lcb_list <= 0).all(dim=-1)]
+    
     if feasible_candidates.size(0) == 0:
-        # sample a random number of feasible candidates from the original candidates
+        # If no feasible candidates found, sample a random number of feasible candidates from the original candidates
         selected_indices = random.sample(range(all_candidates.size(0)), 1000)
         feasible_candidates = all_candidates[selected_indices, :]
         print("No feasible candidates found in the current batch, sampling from all candidates.")
-    # Optimize the acquisition function to find the next query point
-    if acq_type == "qKG":
+    
+    if return_sampling_flag:
+        # Return the feasible candidates and a flag indicating that sampling was done
+        return feasible_candidates, True
+    # Otherwise, just return the feasible candidates
+    return feasible_candidates
+
+def optimize_acqf_and_evaluate_constrained(
+    acq_func,
+    bounds,
+    feasible_candidates,
+    objective_func,
+    constraint_func
+):
+    if acq_func.__class__.__name__ == "qKnowledgeGradient":
         candidate = optimize_acqf_discrete_qKG(
             bounds,
             acq_func,
@@ -486,10 +500,45 @@ def bo_constrained_single_iteration(
     # Evaluate the function and the constraints at the new point
     new_Y = objective_func(candidate).unsqueeze(-1)
     new_constraints = constraint_func(candidate).unsqueeze(-1)
+    return new_Y, new_constraints, candidate
+
+def bo_constrained_single_iteration(
+    objective_func,
+    constraint_func,
+    acq_type,
+    bounds,
+    train_X,
+    train_Y,
+    train_constraints,
+    feasible_candidates,
+    gp
+):
+    # fit main objective GP
+    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
+        flip = -1
+    else:
+        flip = 1
+    # Prepare acquisition function
+    acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
+    # Optimize the acquisition function to find the next query point
+    new_Y, new_constraints, candidate = optimize_acqf_and_evaluate_constrained(
+        acq_func,
+        bounds,
+        feasible_candidates,
+        objective_func,
+        constraint_func
+    )
     # Update the dataset
     train_X = torch.cat([train_X, candidate])
     train_Y = torch.cat([train_Y, new_Y])
     train_constraints = torch.cat([train_constraints, new_constraints], dim=0)
+    # Fit the GPs again with the new data
+    gp, constraint_gps = fit_gp_constrained(
+        train_X, 
+        train_Y, 
+        train_constraints, 
+        flip
+    )
     return train_X, train_Y, train_constraints, gp, constraint_gps
 
 def bo_constrained_full_loop(
@@ -499,7 +548,7 @@ def bo_constrained_full_loop(
     bounds,
     X_init,
     Y_init,
-    train_constraints_init,
+    constraints_init,
     num_iterations,
     all_candidates
 ):
@@ -509,10 +558,28 @@ def bo_constrained_full_loop(
     # Generate initial training data
     train_X = X_init.clone()
     train_Y = Y_init.clone()
-    train_constraints = train_constraints_init.clone()
+    train_constraints = constraints_init.clone()
+
+    # Fit initial GPs
+    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
+        flip = -1
+    else:
+        flip = 1
+    gp, constraint_gps = fit_gp_constrained(
+        train_X, 
+        train_Y, 
+        train_constraints, 
+        flip
+    )
+
+    feasible_candidates = get_feasible_candidates(
+        constraint_gps=constraint_gps,  # No initial constraints GP
+        all_candidates=all_candidates,
+        beta_t_sqrt=(10*math.log(train_Y.shape[0]))**0.5
+    )
     
     for iteration_idx in range(num_iterations):
-        train_X, train_Y, train_constraints, _, _ = bo_constrained_single_iteration(
+        train_X, train_Y, train_constraints, gp, constraint_gps = bo_constrained_single_iteration(
             objective_func,
             constraint_func,
             acq_type,
@@ -520,7 +587,13 @@ def bo_constrained_full_loop(
             train_X,
             train_Y,
             train_constraints,
-            all_candidates
+            feasible_candidates,
+            gp
+        )
+        feasible_candidates = get_feasible_candidates(
+            constraint_gps=constraint_gps,  # No initial constraints GP
+            all_candidates=all_candidates,
+            beta_t_sqrt=(10*math.log(train_Y.shape[0]))**0.5
         )
         if (train_constraints >= 0).all(dim=1).squeeze(-1).any():
             best_feasible_value = train_Y[(train_constraints >= 0).all(dim=1).squeeze(-1)].min().item()
