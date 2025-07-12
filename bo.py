@@ -134,6 +134,10 @@ def calculate_cumulative_regret(observations, true_minimum):
     return cumulative_regret
 
 def fit_gp(X, Y):
+    nrows = X.shape[0]
+    ncols = X.shape[1]
+    X = X.reshape((nrows, ncols))
+    Y = Y.reshape((nrows, 1))  # Ensure Y is a column vector
     gp = SingleTaskGP(
         X, 
         Y, 
@@ -220,6 +224,7 @@ def _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip):
     elif acq_type == "TS":
         acq_func = PathwiseThompsonSampling(gp)
     else:
+        print(f"Invalid acquisition function type: {acq_type}")
         raise ValueError("Invalid acquisition function type")    
     return acq_func
 

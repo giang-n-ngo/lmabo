@@ -241,8 +241,12 @@ def run_problem_constrained(
                 num_iterations,
             )
             # optimize and get results
-            train_X, train_Y, train_constraints, acq_type_list, messages = LMABO.optimize()
-            del LMABO
+            try:
+                train_X, train_Y, train_constraints, acq_type_list, messages = LMABO.optimize()
+                del LMABO
+            except Exception as e:
+                print(f"Error during LMABO optimization: {e}")
+                continue
         else:
             train_X, train_Y, train_constraints = bo_constrained_full_loop(
                 objective_func,

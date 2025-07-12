@@ -266,8 +266,7 @@ class LanguageModelAssistedAdaptiveConstrainedBO:
         self.gp = fit_gp(self.train_X, self.train_Y)
         self.constraint_gps = [fit_gp(self.train_X, self.train_constraints[:, i])
             for i in range(self.train_constraints.shape[1])]
-        self._extract_cales()  # Extract lengthscales and output scales from the GP models
-        # Store initial lengthscales and outputscale
+        self._extract_scales()  # Extract lengthscales and output scales from the GP models
         self.remaining_iterations = self.num_iterations
         self.convo = ConversationHolder(
             "api", 
@@ -329,7 +328,7 @@ class LanguageModelAssistedAdaptiveConstrainedBO:
         print(f"Iter {len(self.acq_type_list)}|", prompt)
         return prompt
 
-    def _extract_cales(self):
+    def _extract_scales(self):
         """Extracts lengthscales from the Gaussian Process models."""
         self.main_lengthscales = self.gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
         self.main_outputscale = self.gp.covar_module.outputscale.detach().cpu().numpy()
@@ -372,7 +371,7 @@ class LanguageModelAssistedAdaptiveConstrainedBO:
                     feasible_candidates,
                     self.gp
                 )
-            self._extract_cales()
+            self._extract_scales()
             feasible_candidates, sampling_flag = get_feasible_candidates(
                 constraint_gps=self.constraint_gps,  # No initial constraints GP
                 all_candidates=self.all_candidates,

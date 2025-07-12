@@ -6,7 +6,7 @@
 #SBATCH --gpus=1
 #SBATCH --time=48:00:00 
 #SBATCH --mem=24GB                    
-#SBATCH --cpus-per-gpu=16             
+#SBATCH --cpus-per-gpu=12             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -37,8 +37,8 @@ run_batch() {
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 4 problems
-echo "Running problems in batches of 4..."
+# Split into batches of 3 problems
+echo "Running problems in batches of 3..."
 run_batch "${problems[@]:0:3}"    # Problems 0-2
 run_batch "${problems[@]:3:3}"    # Problems 3-5
 
