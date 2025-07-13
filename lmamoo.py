@@ -116,7 +116,7 @@ class LanguageModelAssistedAdaptiveMOO:
         Constructs a prompt summarizing the statistics of the objectives.
         """
         objective_stats = []
-        for i in range(self.bounds.shape[-1]):
+        for i in range(len(self.gps.models)):
             f_min = self.train_Y[:, i].min().item()
             f_max = self.train_Y[:, i].max().item()
             f_mean = self.train_Y[:, i].mean().item()
@@ -125,7 +125,7 @@ class LanguageModelAssistedAdaptiveMOO:
             max_ls = self.lengthscales[:, i].max().item()
             mean_ls = self.lengthscales[:, i].mean().item()
             std_ls = self.lengthscales[:, i].std().item()
-            outputscale = self.outputscale[i].item()
+            outputscale = self.outputscales[i].item()
 
             objective_stats.append(
                 MOO_OBJ_STATS_TEMPLATE.format(
@@ -163,15 +163,15 @@ class LanguageModelAssistedAdaptiveMOO:
     
     def _extract_scales(self):
         """Extracts lengthscales and outputscale from all Gaussian Process models."""
-        self.lengthscales = []
-        self.outputscale = []
-        for gp in self.gps.models:
+        self.lengthscales = np.zeros((len(self.gps.models), self.train_X.shape[1]))
+        self.outputscales = np.zeros((len(self.gps.models)))
+        for obj_idx, gp in enumerate(self.gps.models):
             ls = gp.covar_module.base_kernel.lengthscale.detach().cpu().numpy()
             os = gp.covar_module.outputscale.detach().cpu().numpy()
-            self.lengthscales.append(ls)
-            self.outputscale.append(os)
-        self.lengthscales = np.array(self.lengthscales)
-        self.outputscale = np.array(self.outputscale)
+            self.lengthscales[obj_idx, :] = ls
+            self.outputscales[obj_idx] = os
+        print(self.lengthscales)
+        print(self.outputscales)
 
     def _get_moo_results(self):
         """
