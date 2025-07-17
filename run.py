@@ -285,4 +285,4 @@ if __name__=="__main__":
             for acq_type in acq_type_mapping.keys():
                 run_problem(args.problem, acq_type, starting_exp_idx)
         else:
-            run_problem(args.problem, args.method, starting_exp_idx) 
+            run_problem(args.problem, args.method, starting_exp_idx, args.server_node) 
