@@ -172,14 +172,18 @@ class QwenChatbot:
         Returns:
             Cleaned response text
         """
-        # Remove everything between <think> and </think> tags (including newlines)
-        cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-        # Remove any remaining <think> or </think> tags
-        cleaned = re.sub(r'</?think>', '', cleaned)
-        # Clean up extra whitespace
-        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
-        cleaned = cleaned.strip()
-        return cleaned
+        # check if response_text is string
+        if isinstance(response_text, str):
+            # Remove everything between <think> and </think> tags (including newlines)
+            cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+            # Remove any remaining <think> or </think> tags
+            cleaned = re.sub(r'</?think>', '', cleaned)
+            # Clean up extra whitespace
+            cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
+            cleaned = cleaned.strip()
+            return cleaned
+        else:
+            return ""
     
     def _manage_context_length(self, prompt):
         """
@@ -240,7 +244,6 @@ class QwenChatbot:
             
             # Manage context length to prevent overflow
             prompt = self._manage_context_length(prompt)
-            
             if self.hosted:
                 # call the client API for hosted models
                 outputs = self.client.chat.completions.create(
