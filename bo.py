@@ -460,16 +460,16 @@ def get_feasible_candidates(
     """
     Get feasible candidates based on the lower confidence bound of the constraints.
     """
-    lcb_list = []
+    ucb_list = []
     for constraint_gp in constraint_gps:
         # Get lower confidence bound for the constraint
-        lcb = constraint_gp.posterior(all_candidates).mean - \
+        ucb = constraint_gp.posterior(all_candidates).mean + \
             beta_t_sqrt * constraint_gp.posterior(all_candidates).variance.sqrt()
-        lcb_list.append(lcb.squeeze(-1))
-    lcb_list = torch.stack(lcb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
+        ucb_list.append(ucb.squeeze(-1))
+    ucb_list = torch.stack(ucb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
     
     # Filter candidates that satisfy all constraints
-    feasible_candidates = all_candidates[(lcb_list <= 0).all(dim=-1)]
+    feasible_candidates = all_candidates[(ucb_list >= 0).all(dim=-1)]
     
     if feasible_candidates.size(0) == 0:
         # If no feasible candidates found, sample a random number of feasible candidates from the original candidates
@@ -495,6 +495,7 @@ def optimize_acqf_and_evaluate_constrained(
             bounds,
             acq_func,
             choices=feasible_candidates,
+            batch_size=1024
         )
     else:
         candidate, _ = optimize_acqf_discrete(

@@ -255,7 +255,8 @@ class ConversationHolder:
         llm="api",
         first_prompt="",
         full_acq_type_list=[],
-        server_node="localhost"  # Default to localhost if not specified
+        server_node="localhost",  # Default to localhost if not specified,
+        default_af="UCB"
     ):
         self.llm = llm
         self.full_acq_type_list = full_acq_type_list
@@ -269,7 +270,7 @@ class ConversationHolder:
         elif self.llm == "ops":
             self.chatbot = configure_and_start_chat_ops(first_prompt, server_node)
             self.messages.append(self.chatbot.history[-1]["content"])
-        self.default_af = "UCB"
+        self.default_af = default_af
 
     def _api_process_suggestion_response(self, response_text):
         """
@@ -282,15 +283,14 @@ class ConversationHolder:
         Returns:
             tuple: Suggested AF and its justification.
         """
-        print(response_text)
         if ":" in response_text:
-            af, justification = response_text.split(":")
+            af, justification = response_text.split(":", maxsplit=1)
             af = af.strip()
             justification = justification.strip()
         else:
             af = response_text.strip()
-            if af not in self.full_acq_type_list:
-                af = self.default_af
+        if af not in self.full_acq_type_list:
+            af = self.default_af
             justification = "Nothing"
         print(f"LLM suggested AF: {af} justified by: {justification}")
         self.messages.append(response_text.strip())

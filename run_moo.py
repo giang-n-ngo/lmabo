@@ -41,7 +41,8 @@ def save_results(
     np.save(f"{folder_path}/{exp_idx}_hv.npy", hv_list)
     np.save(f"{folder_path}/{exp_idx}_log_hv_diff.npy", log_hv_diff_list)
     if acq_type_list is not None:
-        np.save(f"{folder_path}/{exp_idx}_acq_type_list.npy", acq_type_list)
+        with open(f"{folder_path}/{exp_idx}_acq_types.txt", "w") as f:
+            f.write("\n".join(acq_type_list))
     if messages is not None:
         with open(f"{folder_path}/{exp_idx}_messages.txt", "w") as f:
             f.write("\n".join(messages))

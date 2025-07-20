@@ -53,7 +53,7 @@ At each step:
 When responding, select the acquisition function you deem most appropriate. 
 Your justification should briefly explain why that function is suitable given the provided optimization summary, referencing relevant aspects like exploration/exploitation balance, remaining iterations, or model characteristics. 
 The response should be in the format "Acquisition abbreviation: justification", similar to these examples:
-- 'qLBMOMES: This is a good choice because ...'
+- 'qNEHVI: This is a good choice because ...'
 - 'qParEGO: This is chosen given the current state of the optimization since ...'
 Firstly, just give a brief confirmation that you understand the task and the available acquisition functions.
 """
@@ -96,7 +96,6 @@ class LanguageModelAssistedAdaptiveMOO:
         self.bounds = bounds
         self.num_iterations = num_iterations
         self.llm = llm
-        self.best_values = [self.train_Y.min().item()]
         self.acq_type_list = []
         # optimization loop
         self.gps = fit_moo_gp(self.train_X, self.train_Y, self.bounds)
@@ -106,7 +105,8 @@ class LanguageModelAssistedAdaptiveMOO:
             llm, 
             first_prompt=INITIAL_PROMPT_CONTENT, 
             full_acq_type_list=list(moo_acq_type_mapping.keys()),
-            server_node=server_node
+            server_node=server_node,
+            default_af="qParEGO"  # Default acquisition function
         )
         self.hv_list = []
         self.log_hv_diff_list = []
@@ -151,15 +151,17 @@ class LanguageModelAssistedAdaptiveMOO:
         shortest_dist = get_shortest_distance_from_last_point(self.train_X, self.bounds)
         objective_stats_prompt = self._get_objective_stats_prompt()
 
-        return FOLLOW_UP_PROMPT_TEMPLATE.format(
+        prompt = FOLLOW_UP_PROMPT_TEMPLATE.format(
             N=self.train_Y.shape[0],
             remaining=self.remaining_iterations,
             D=self.train_X.shape[1],
             J=self.train_Y.shape[-1],
-            hv=self.best_values[-1],
+            hv=self.hv_list[-1],
             shortest_dist=shortest_dist,
             objective_info=objective_stats_prompt
         )
+        print(f"Iter {len(self.acq_type_list)}|", prompt)
+        return prompt
     
     def _extract_scales(self):
         """Extracts lengthscales and outputscale from all Gaussian Process models."""
@@ -170,8 +172,6 @@ class LanguageModelAssistedAdaptiveMOO:
             os = gp.covar_module.outputscale.detach().cpu().numpy()
             self.lengthscales[obj_idx, :] = ls
             self.outputscales[obj_idx] = os
-        print(self.lengthscales)
-        print(self.outputscales)
 
     def _get_moo_results(self):
         """

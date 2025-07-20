@@ -31,18 +31,18 @@ You will receive their range (min/max), mean, and standard deviation.
 - **Model outputscale: ** It defines the overall magnitude or amplitude of the function's variation.
 
 Available acquisition functions you can choose from, with brief descriptions of their primary uses:
-1.  **PI (Probability of Improvement):** 
-2.  **LogPI (Log Probability of Improvement):** 
-3.  **EI (Expected Improvement):** 
-4.  **LogEI (Log Expected Improvement):** 
-5.  **UCB (Upper Confidence Bound):** 
-6.  **PosMean (Posterior Mean):** 
-7.  **PosSTD (Posterior Standard Deviation):** 
-8.  **TS (Thompson Sampling):**
-9.  **qKG (Knowledge Gradient):** 
-10. **qPES (Predictive Entropy Search):** 
-11. **qMES (Max-value Entropy Search):**
-12. **qJES (Joint Entropy Search):** 
+1.  PI (Probability of Improvement)
+2.  LogPI (Log Probability of Improvement)
+3.  EI (Expected Improvement) 
+4.  LogEI (Log Expected Improvement) 
+5.  UCB (Upper Confidence Bound) 
+6.  PosMean (Posterior Mean):** 
+7.  PosSTD (Posterior Standard Deviation) 
+8.  TS (Thompson Sampling)
+9.  qKG (Knowledge Gradient) 
+10. qPES (Predictive Entropy Search) 
+11. qMES (Max-value Entropy Search)
+12. qJES (Joint Entropy Search) 
 
 At each step:
 - **Review the provided summary of the optimization process and consider the current state of the optimization.**
@@ -51,7 +51,7 @@ At each step:
 
 When responding, select the acquisition function you deem most appropriate. 
 Your justification should briefly explain why that function is suitable given the provided optimization summary, referencing relevant aspects like exploration/exploitation balance, remaining iterations, or model characteristics. 
-The response should be in the format "Acquisition abbreviation: justification", similar to these examples:
+The response must strictly follow the format "Acquisition abbreviation: justification", similar to these examples:
 - 'qKG: This is a good choice because ...'
 - 'EI: This is chosen given the current state of the optimization since ...'
 Firstly, just give a brief confirmation that you understand the task and the available acquisition functions.
@@ -82,18 +82,18 @@ You will receive their range (min/max), mean, and standard deviation.
 - **Model outputscale: ** It defines the overall magnitude or amplitude of the function's variation
 
 Available acquisition functions you can choose from, with brief descriptions of their primary uses:
-1.  **PI (Probability of Improvement):** 
-2.  **LogPI (Log Probability of Improvement):** 
-3.  **EI (Expected Improvement):** 
-4.  **LogEI (Log Expected Improvement):** 
-5.  **UCB (Upper Confidence Bound):** 
-6.  **PosMean (Posterior Mean):** 
-7.  **PosSTD (Posterior Standard Deviation):** 
-8.  **TS (Thompson Sampling):**
-9.  **qKG (Knowledge Gradient):** 
-10. **qPES (Predictive Entropy Search):** 
-11. **qMES (Max-value Entropy Search):**
-12. **qJES (Joint Entropy Search):** 
+1.  PI (Probability of Improvement)
+2.  LogPI (Log Probability of Improvement)
+3.  EI (Expected Improvement) 
+4.  LogEI (Log Expected Improvement) 
+5.  UCB (Upper Confidence Bound) 
+6.  PosMean (Posterior Mean):** 
+7.  PosSTD (Posterior Standard Deviation) 
+8.  TS (Thompson Sampling)
+9.  qKG (Knowledge Gradient) 
+10. qPES (Predictive Entropy Search) 
+11. qMES (Max-value Entropy Search)
+12. qJES (Joint Entropy Search) 
 
 At each step:
 - **Review the provided summary of the optimization process and consider the current state of the optimization.**
@@ -102,7 +102,7 @@ At each step:
 
 When responding, select the acquisition function you deem most appropriate. 
 Your justification should briefly explain why that function is suitable given the provided optimization summary, referencing relevant aspects like exploration/exploitation balance, remaining iterations, or model characteristics. 
-The response should be in the format "Acquisition abbreviation: justification", similar to these examples:
+The response must strictly follow the format "Acquisition abbreviation: justification", similar to these examples:
 - 'qKG: This is a good choice because ...'
 - 'EI: This is chosen given the current state of the optimization since ...'
 Firstly, just give a brief confirmation that you understand the task and the available acquisition functions.
@@ -173,7 +173,8 @@ class LanguageModelAssistedAdaptiveBO:
             llm, 
             first_prompt=INITIAL_PROMPT_CONTENT, 
             full_acq_type_list=list(acq_type_mapping.keys()),
-            server_node=server_node
+            server_node=server_node,
+            default_af="UCB"  # Default acquisition function
         )
 
     def _construct_prompt(self):

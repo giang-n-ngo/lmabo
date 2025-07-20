@@ -108,15 +108,15 @@ def generate_candidates(bounds, num_candidates, exp_idx):
     candidates = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(num_candidates).to(dtype=dtype, device=device)
     return candidates
 
-def generate_initial_data(bounds, num_initial_points, exp_idx, objective_func, constrain_fuc=None):
+def generate_initial_data(bounds, num_initial_points, exp_idx, objective_func, constrain_func=None):
     """Generate initial training data."""
     train_X = generate_candidates(bounds, num_initial_points, exp_idx)
-    if constrain_fuc is None:
+    if constrain_func is None:
         train_Y = objective_func(train_X).unsqueeze(-1)
         return train_X, train_Y
     else:
         train_Y = objective_func(train_X).unsqueeze(-1)
-        train_constraints = constrain_fuc(train_X).unsqueeze(-1)
+        train_constraints = constrain_func(train_X).unsqueeze(-1)
         return train_X, train_Y, train_constraints
 
 def run_problem(
@@ -245,7 +245,8 @@ def run_problem_constrained(
                 train_X, train_Y, train_constraints, acq_type_list, messages = LMABO.optimize()
                 del LMABO
             except Exception as e:
-                print(f"Error during LMABO optimization: {e}")
+                # print(f"Error during LMABO optimization: {e}")
+                raise e
                 continue
         else:
             train_X, train_Y, train_constraints = bo_constrained_full_loop(

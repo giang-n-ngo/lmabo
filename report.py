@@ -75,10 +75,10 @@ elif args.setting == "moo":
     
     active_acq_type_list = list(moo_acq_type_mapping.keys())
     active_acq_type_list += [
+        "lmamoo",
     ]
     excepted_acq_type_list = [
         # Add any methods to exclude from reporting
-        "lmamoo",
     ]
     full_acq_type_list = active_acq_type_list + excepted_acq_type_list
 
@@ -122,6 +122,10 @@ elif args.setting == "moo":
         plot_results(problem, "hv", full_acq_type_list)
 elif args.setting == "constrained":
     from bo import acq_type_mapping, CONSTRAINED_OBJECTIVE_FUNCTIONS
+    from utils import (
+        report_constrained_metrics,
+        fetch_all_constrained_results,
+    )
     
     active_acq_type_list = list(acq_type_mapping.keys())
     active_acq_type_list += [
@@ -147,6 +151,17 @@ elif args.setting == "constrained":
         constrained=True
     )
     print(f"Completed {len(completed_problems)} constrained problems out of {len(problems)}")
+    # fetch all results
+    problem_result = fetch_all_constrained_results(
+        completed_problems, 
+        full_acq_type_list
+    )
+    # rank per problem
+    for problem in completed_problems:
+        report_constrained_metrics(
+            problem, 
+            problem_result[problem]
+        )
 
 # Don't forget to close the file
 sys.stdout.close()

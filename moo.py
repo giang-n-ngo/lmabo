@@ -119,7 +119,7 @@ MOO_NUM_ITERATIONS = {
     "DTLZ2": 200,
     "BraninCurrin": 50,
     "Penicillin": 200,
-    "VehicleSafety": 200,
+    "VehicleSafety": 100,
     "CarSideImpact": 200
 }
 
@@ -281,6 +281,8 @@ def mobo_single_iteration(
             )
         elif acq_type == 'qMOPES':
             acqf = qMultiObjectivePredictiveEntropySearch(model=model, pareto_sets=ps)
+        else:
+            raise ValueError(f"Unknown acquisition type: {acq_type}")
     elif acq_type == 'qParEGO':
         normed_train_X = normalize(train_X, bounds)
         with torch.no_grad():
@@ -341,6 +343,13 @@ def mobo_full_loop(
     train_X  = X_init.clone()
     train_Y  = Y_init.clone()
     hv_list, log_hv_difference_list = [], []
+    hv, log_hv_difference = get_moo_results(
+        train_Y, 
+        objective_func.ref_point, 
+        max_hv
+    )
+    hv_list.append(hv)
+    log_hv_difference_list.append(log_hv_difference)
     for iteration_idx in range(num_iterations):
         train_X, train_Y, _ = mobo_single_iteration(train_X, train_Y, acq_type, objective_func, bounds)
         hv, log_hv_difference = get_moo_results(

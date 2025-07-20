@@ -92,14 +92,32 @@ DIMS = {
     Rastrigin: 23,
     Rosenbrock: 24,
     StyblinskiTang: 21,
-    KeaneBumpFunction: 5,
+    KeaneBumpFunction: 2,
 }
 
 CONSTRAINED_OBJECTIVE_FUNCTIONS = [
     ConstrainedGramacy, # 2D 2 constraints OK
+    ConstrainedHartmann, # 6D 1 constraints
     KeaneBumpFunction, # 5D 2 constraints
     PressureVessel, # 4D 4 constraints OK
-    ConstrainedHartmann, # 6D 1 constraints
     TensionCompressionString, # 3D 4 constraints
     WeldedBeamSO, # 4D 6 constraints OK
 ]
+
+CONSTRAINED_OBJECTIVE_BEST_VALUES = {
+    "ConstrainedGramacy": 0.5998,
+    "ConstrainedHartmann": -3.32237,
+    "KeaneBumpFunction": -0.365,
+    "PressureVessel": 6059.946341,
+    "TensionCompressionString": 0.012681,
+    "WeldedBeamSO": 1.728226,
+}
+
+CONSTRAINED_OBJECTIVE_MAX_VALUES = {
+    "ConstrainedGramacy": 1.9941,
+    "ConstrainedHartmann": -8.262e-07,
+    "KeaneBumpFunction": -1.475e-13,
+    "PressureVessel": 257608,
+    "TensionCompressionString": 20.8635,
+    "WeldedBeamSO": 1170.3688,
+}
