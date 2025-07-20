@@ -89,7 +89,7 @@ class QwenChatbot:
             model_name: Hugging Face model name/path
         """
         self.hosted = hosted
-        self.max_tokens = 4096  # Maximum tokens for generation
+        self.max_tokens = 2048  # Reduced from 4096 to leave more room for context
         self.top_p = 0.9  # Nucleus sampling probability
         print(f"Loading model: {model_name}")
         if hosted:
@@ -172,14 +172,61 @@ class QwenChatbot:
         Returns:
             Cleaned response text
         """
-        # Remove everything between <think> and </think> tags (including newlines)
-        cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
-        # Remove any remaining <think> or </think> tags
-        cleaned = re.sub(r'</?think>', '', cleaned)
-        # Clean up extra whitespace
-        cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
-        cleaned = cleaned.strip()
-        return cleaned
+        # check if response_text is string
+        if isinstance(response_text, str):
+            # Remove everything between <think> and </think> tags (including newlines)
+            cleaned = re.sub(r'<think>.*?</think>', '', response_text, flags=re.DOTALL)
+            # Remove any remaining <think> or </think> tags
+            cleaned = re.sub(r'</?think>', '', cleaned)
+            # Clean up extra whitespace
+            cleaned = re.sub(r'\n\s*\n', '\n', cleaned)  # Remove empty lines
+            cleaned = cleaned.strip()
+            return cleaned
+        else:
+            return ""
+    
+    def _manage_context_length(self, prompt):
+        """
+        Manage conversation history to prevent context overflow.
+        If the prompt is too long, remove older messages from history.
+        
+        Args:
+            prompt: The formatted prompt string
+            
+        Returns:
+            Adjusted prompt that fits within context limits
+        """
+        # Rough estimation: 1 token ≈ 4 characters for most languages
+        # Leave some buffer for safety
+        max_context_chars = 30000 * 4  # ~30k tokens in characters
+        max_completion_chars = self.max_tokens * 4  # Reserve space for completion
+        available_chars = max_context_chars - max_completion_chars
+        
+        if len(prompt) <= available_chars:
+            return prompt
+        
+        print(f"Warning: Prompt too long ({len(prompt)} chars), trimming conversation history...")
+        
+        # Keep system prompt and recent messages
+        system_part = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+        assistant_start = "<|im_start|>assistant\n"
+        
+        # Remove older messages from history until prompt fits
+        while len(prompt) > available_chars and len(self.history) > 2:
+            # Remove the second oldest message (keep the most recent user message)
+            if len(self.history) > 2:
+                self.history.pop(1)  # Remove second message (keep first user message)
+            
+            # Rebuild prompt
+            prompt = system_part
+            for message in self.history:
+                role = message["role"]
+                content = message["content"]
+                prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+            prompt += assistant_start
+        
+        print(f"Trimmed prompt to {len(prompt)} characters with {len(self.history)} messages in history")
+        return prompt
     
     def generate_response(self, user_message):
         """
@@ -195,6 +242,8 @@ class QwenChatbot:
             # Format the prompt with conversation history
             prompt = self._format_chat_prompt(user_message)
             
+            # Manage context length to prevent overflow
+            prompt = self._manage_context_length(prompt)
             if self.hosted:
                 # call the client API for hosted models
                 outputs = self.client.chat.completions.create(
