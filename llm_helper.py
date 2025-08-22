@@ -305,7 +305,7 @@ class ConversationHolder:
         first_prompt="",
         full_acq_type_list=[],
         server_node="localhost",  # Default to localhost if not specified,
-        default_af="UCB"
+        default_choice="UCB"
     ):
         self.llm = llm
         self.full_acq_type_list = full_acq_type_list
@@ -319,7 +319,7 @@ class ConversationHolder:
         elif self.llm == "ops":
             self.chatbot = configure_and_start_chat_ops(first_prompt, server_node)
             self.messages.append(self.chatbot.history[-1]["content"])
-        self.default_af = default_af
+        self.default_choice = "Exploration"
 
     def _api_process_suggestion_response(self, response_text):
         """
@@ -333,23 +333,23 @@ class ConversationHolder:
             tuple: Suggested AF and its justification.
         """
         if ":" in response_text:
-            af, justification = response_text.split(":", maxsplit=1)
-            af = af.strip()
+            response, justification = response_text.split(":", maxsplit=1)
+            response = response.strip()
             justification = justification.strip()
         else:
-            af = response_text.strip()
-        if af not in self.full_acq_type_list:
-            af = self.default_af
+            response = response_text.strip()
+        if response not in self.full_acq_type_list:
+            response = self.default_choice
             justification = "Nothing"
-        print(f"LLM suggested AF: {af} justified by: {justification}")
+        print(f"LLM suggested AF: {response} justified by: {justification}")
         self.messages.append(response_text.strip())
-        return af
+        return response
 
     def _api_suggest_acq_type(self, prompt):
         retries = 0
         current_delay = self.api_initial_delay_seconds
         
-        llm_suggested_af = self.default_af
+        llm_suggested_af = self.default_choice
         while retries < self.api_max_entries:
             try:
                 # Send the updated summary to the active chat
@@ -362,7 +362,7 @@ class ConversationHolder:
                 else:
                     print("LLM returned no text content in response.")
                     self.messages.append("LLM returned no text content in response.")
-                    llm_suggested_af = self.default_af # Or handle as an error
+                    llm_suggested_af = self.default_choice # Or handle as an error
                     break
 
             except ResourceExhausted as e:
@@ -402,32 +402,32 @@ class ConversationHolder:
 
     def _ops_process_suggestion_response(self, response_text):
         """
-        Process the response text from the LLM to extract the suggested acquisition function (AF)
+        Process the response text from the LLM to extract the suggested choice
         and its justification.
         
         Args:
             response_text (str): The raw response text from the LLM.
         
         Returns:
-            str: Suggested AF
+            str: Suggested choice
         """        
-        # Extract AF and justification
-        af = self.default_af
+        # Extract choice and justification
+        choice = self.default_choice
         justification = "Nothing"
-        
-        af, justification = response_text.split(":", maxsplit=1)
-        
-        # Validate AF is in the allowed list
-        if af not in self.full_acq_type_list:
-            print(f"Invalid AF '{af}', using default '{self.default_af}'")
-            af = self.default_af
-        
-        print(f"LLM suggested AF: {af} justified by: {justification}")
+
+        choice, justification = response_text.split(":", maxsplit=1)
+
+        # Validate choice is in the allowed list
+        if choice not in self.full_acq_type_list:
+            print(f"Invalid choice '{choice}', using default '{self.default_choice}'")
+            choice = self.default_choice
+
+        print(f"LLM suggested choice: {choice} justified by: {justification}")
         self.messages.append(response_text)
-        return af
+        return choice
 
     def _ops_suggest_acq_type(self, prompt):
-        llm_suggested_af = self.default_af
+        llm_suggested_af = self.default_choice
         try:
             response = self.chatbot.generate_response(prompt)
             if response:
@@ -435,7 +435,7 @@ class ConversationHolder:
                 self.messages.append(response.strip())
             else:
                 print("LLM returned no text content in response.")
-                llm_suggested_af = self.default_af # Or handle as an error
+                llm_suggested_af = self.default_choice # Or handle as an error
         except Exception as e:
             print(f"An error occurred during LLM call: {e}")
             llm_suggested_af = "Intentional Incorrect AF"
@@ -447,6 +447,82 @@ class ConversationHolder:
         elif self.llm == "ops":
             return self._ops_suggest_acq_type(prompt)
         
+    def _api_suggest_choice(self, prompt):
+        retries = 0
+        current_delay = self.api_initial_delay_seconds
+        
+        llm_suggested_choice = self.default_choice
+        while retries < self.api_max_entries:
+            try:
+                # Send the updated summary to the active chat
+                response = self.chat.send_message(prompt)
+
+                if response.text:
+                    llm_suggested_choice = self._api_process_suggestion_response(response.text)
+                    break # Success, exit retry loop
+
+                else:
+                    print("LLM returned no text content in response.")
+                    self.messages.append("LLM returned no text content in response.")
+                    llm_suggested_choice = self.default_choice # Or handle as an error
+                    break
+
+            except ResourceExhausted as e:
+                error_message = str(e) # Get the full string representation of the error
+                suggested_delay_seconds = current_delay # Default to current backoff delay
+
+                # Use regex to find the retry_delay from the error string
+                match = re.search(r"retry_delay \{[\s\n]+seconds: (\d+)[\s\n]+\}", error_message)
+                if match:
+                    try:
+                        suggested_delay_seconds = int(match.group(1))
+                        print(f"API suggested waiting {suggested_delay_seconds} seconds (parsed from error message).")
+                    except ValueError:
+                        print("Could not parse suggested retry delay from error message. Using exponential backoff.")
+                else:
+                    print("No specific retry_delay found in error message. Using exponential backoff.")
+
+                print(f"Rate limit hit (Retry {retries+1}/{self.api_max_entries}).")
+                
+                # Use the parsed suggested delay, or our exponential backoff
+                wait_time = suggested_delay_seconds + random.uniform(0, suggested_delay_seconds * 0.1) # Add jitter
+                wait_time = min(wait_time, self.api_max_delay_seconds) # Cap the wait time
+
+                print(f"Waiting for {wait_time:.2f} seconds...")
+                time.sleep(wait_time)
+
+                retries += 1
+                current_delay = min(current_delay * 2, self.api_max_delay_seconds) # Double delay for next retry
+
+            except Exception as e:
+                print(f"An unexpected error occurred during API call: {e}")
+                break # Exit retry loop for other errors
+        else:
+            print(f"Failed to get LLM response after {self.api_max_entries} retries.")
+            return "Intentional Incorrect Choice"
+        return llm_suggested_choice  # Return the chat object and the response text for logging
+
+    def _ops_suggest_choice(self, prompt):
+        llm_suggested_choice = self.default_choice
+        try:
+            response = self.chatbot.generate_response(prompt)
+            if response:
+                llm_suggested_choice = self._ops_process_suggestion_response(response.strip())
+                self.messages.append(response.strip())
+            else:
+                print("LLM returned no text content in response.")
+                llm_suggested_choice = self.default_choice # Or handle as an error
+        except Exception as e:
+            print(f"An error occurred during LLM call: {e}")
+            llm_suggested_choice = "Intentional Incorrect Choice"
+        return llm_suggested_choice
+
+    def suggest_choice(self, prompt):
+        if self.llm == "api":
+            return self._api_suggest_choice(prompt)
+        elif self.llm == "ops":
+            return self._ops_suggest_choice(prompt)
+
     def _api_last_guess(self, last_prompt):
         try:
             response = self.chat.send_message(last_prompt)

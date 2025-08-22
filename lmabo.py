@@ -52,8 +52,8 @@ At each step:
 When responding, select the acquisition function you deem most appropriate. 
 Your justification should briefly explain why that function is suitable given the provided optimization summary, referencing relevant aspects like exploration/exploitation balance, remaining iterations, or model characteristics. 
 The response must strictly follow the format "Acquisition abbreviation: justification", similar to these examples:
-- 'qKG: This is a good choice because ...'
-- 'EI: This is chosen given the current state of the optimization since ...'
+- 'AF_ABBREVIATION: Your justification for choosing this specific function.'
+- 'XXX: A brief reason explaining why XXX is the optimal choice now.'
 Firstly, just give a brief confirmation that you understand the task and the available acquisition functions.
 """
 
@@ -174,7 +174,7 @@ class LanguageModelAssistedAdaptiveBO:
             first_prompt=INITIAL_PROMPT_CONTENT, 
             full_acq_type_list=list(acq_type_mapping.keys()),
             server_node=server_node,
-            default_af="UCB"  # Default acquisition function
+            default_choice="UCB"  # Default acquisition function
         )
 
     def _construct_prompt(self):
