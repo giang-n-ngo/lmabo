@@ -1,12 +1,14 @@
 from bo import (
-    bo_full_loop, 
-    gp_hedge_full_loop,
-    bo_constrained_full_loop,
-    acq_type_mapping, 
-    prepare_objective_func,
-    prepare_objective_func_constrained
+    acq_type_mapping,
 )
-from constants import EXP_RUNS, NUMERICAL_RESULTS_DIR
+from constants import (
+    EXP_RUNS, 
+    NUMERICAL_RESULTS_DIR, 
+    BOTORCH_FUNCTIONS_NAMES,
+    COCO_FUNCTIONS_NAMES,
+    HPT_FUNCTIONS_NAMES
+)
+from test_functions.test_function_loader import load_objective_func
 
 import argparse
 import numpy as np
@@ -28,9 +30,9 @@ def save_results(
     simple_regret=None, 
     cum_regret=None, 
     acq_type_list=None, 
+    choice_list=None,
     messages=None, 
     weights=None,
-    train_constraints=None
 ):
     """
     Save the results of the optimization run.
@@ -52,13 +54,14 @@ def save_results(
     if acq_type_list is not None:
         with open(f"{folder_path}/{exp_idx}_acq_types.txt", "w") as f:
             f.write("\n".join(acq_type_list))
+    if choice_list is not None:
+        with open(f"{folder_path}/{exp_idx}_choices.txt", "w") as f:
+            f.write("\n".join(choice_list))
     if messages is not None:
         with open(f"{folder_path}/{exp_idx}_messages.txt", "w") as f:
             f.write("\n".join(messages))
     if weights is not None:
         np.save(f"{folder_path}/{exp_idx}_weights.npy", weights)
-    if train_constraints is not None:
-        np.save(f"{folder_path}/{exp_idx}_train_constraints.npy", train_constraints)
 
 @dataclass
 class ExperimentConfig:
@@ -67,31 +70,42 @@ class ExperimentConfig:
     num_iterations_low_dim: int = 50
     num_iterations_high_dim: int = 100
     dim_threshold: int = 10
-    dtype: torch.dtype = torch.double
 
-def setup_experiment(problem, constrained=False):
-    if not constrained:
-        """Common setup for main experiments."""
-        objective_func, dim, bounds = prepare_objective_func(problem)
-        bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
+@dataclass
+class ExperimentConfigHPT:
+    # Special configs for hyperparameter tuning
+    num_initial_points: int = 10
+    num_iterations: int = 50
+
+def prepare_objective_func(problem):
+    if problem in BOTORCH_FUNCTIONS_NAMES:
+        problem_type = "botorch"
+    elif problem in COCO_FUNCTIONS_NAMES:
+        problem_type = "coco"
+    elif problem in HPT_FUNCTIONS_NAMES:
+        problem_type = "hpt"
+    objective_func, dim, bounds = load_objective_func(problem, problem_type)
+    if problem_type != "hpt":
+        objective_func = objective_func.to(dtype=dtype, device=device)
+    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
+    return objective_func, dim, bounds
+
+def setup_experiment(problem):
+    """Common setup for main experiments."""
+    objective_func, dim, bounds = prepare_objective_func(problem)
+    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
+    if problem[:4] == "hpt_":
+        config = ExperimentConfigHPT()
+        num_initial_points = config.num_initial_points
+        num_iterations = config.num_iterations
+    else:
         config = ExperimentConfig()
         num_initial_points = config.num_initial_points_multiplier * dim + config.num_initial_points_offset
         if not SMOKE_TEST:
             num_iterations = config.num_iterations_low_dim if dim <= config.dim_threshold else config.num_iterations_high_dim
         else:
             num_iterations = 5
-        return objective_func, bounds, num_initial_points, num_iterations
-    elif constrained:
-        """Setup for constrained experiments."""
-        objective_func, constraint_func, dim, bounds = prepare_objective_func_constrained(problem)
-        bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
-        config = ExperimentConfig()
-        num_initial_points = config.num_initial_points_multiplier * dim + config.num_initial_points_offset
-        if not SMOKE_TEST:
-            num_iterations = config.num_iterations_low_dim if dim <= config.dim_threshold else config.num_iterations_high_dim
-        else:
-            num_iterations = 5
-        return objective_func, constraint_func, bounds, num_initial_points, num_iterations
+    return objective_func, bounds, num_initial_points, num_iterations
 
 def generate_candidates(bounds, num_candidates, exp_idx):
     """
@@ -108,27 +122,43 @@ def generate_candidates(bounds, num_candidates, exp_idx):
     candidates = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(num_candidates).to(dtype=dtype, device=device)
     return candidates
 
-def generate_initial_data(bounds, num_initial_points, exp_idx, objective_func, constrain_func=None):
+def generate_initial_data(
+        bounds, 
+        num_initial_points, 
+        exp_idx, 
+        objective_func, 
+    ):
     """Generate initial training data."""
-    train_X = generate_candidates(bounds, num_initial_points, exp_idx)
-    if constrain_func is None:
+    if objective_func.name[:4] == "hpt_":
+        initial_configs = objective_func.generate_initialization(
+            num_initial_points,
+            exp_idx
+        )
+        train_X = torch.tensor(
+            [objective_func.map_configs(config) for config in initial_configs], 
+            dtype=dtype, 
+            device=device
+        )
         train_Y = objective_func(train_X).unsqueeze(-1)
-        return train_X, train_Y
     else:
+        train_X = generate_candidates(bounds, num_initial_points, exp_idx)
         train_Y = objective_func(train_X).unsqueeze(-1)
-        train_constraints = constrain_func(train_X).unsqueeze(-1)
-        return train_X, train_Y, train_constraints
+    return train_X, train_Y
 
 def run_problem(
     problem,
     acq_type=None, 
     starting_exp_idx=0,
-    server_node="localhost"  # Default to localhost if not specified
+    server_node="localhost",  # Default to localhost if not specified
+    k=None  # Default value for k
 ):
     print(f"Running {acq_type} on {device}")
     # Experiment setup
     objective_func, bounds, num_initial_points, num_iterations = setup_experiment(problem)
-    folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
+    if k is None:
+        folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
+    else:
+        folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}_k{k}"
     os.makedirs(folder_path, exist_ok=True)
     for exp_idx in range(starting_exp_idx, EXP_RUNS):
         print(f"RUN {exp_idx}")
@@ -144,15 +174,49 @@ def run_problem(
             exp_idx, 
             objective_func
         )
-        acq_type_list, messages, weights = None, None, None
-        if "lmabo" in acq_type:
-            from lmabo import LanguageModelAssistedAdaptiveBO
-            if acq_type == "lmabo":
+        acq_type_list, choice_list, messages, weights = None, None, None, None
+        if acq_type in ["lmabo", "lmabo-ops", "lmabo-ab1", "lmabo-ab2", "lmabo-ab3"]:
+            from lmabo import (
+                LanguageModelAssistedAdaptiveBO, 
+                LanguageModelAssistedAdaptiveBOAblation
+            )
+            if acq_type in ["lmabo", "lmabo-ab1", "lmabo-ab2", "lmabo-ab3"]:
                 llm = "api"
             elif acq_type == "lmabo-ops":
                 llm = "ops"
             # run LMABO
-            LMABO = LanguageModelAssistedAdaptiveBO(
+            if acq_type in ["lmabo", "lmabo-ops"]:
+                LMABO = LanguageModelAssistedAdaptiveBO(
+                    objective_func, 
+                    fixed_train_X, 
+                    fixed_train_Y, 
+                    bounds, 
+                    num_iterations,
+                    llm,
+                    server_node,
+                )
+            elif acq_type in ["lmabo-ab1", "lmabo-ab2", "lmabo-ab3"]:
+                ablation_id = int(acq_type[-1])
+                LMABO = LanguageModelAssistedAdaptiveBOAblation(
+                    objective_func, 
+                    fixed_train_X, 
+                    fixed_train_Y, 
+                    bounds, 
+                    num_iterations,
+                    ablation_id,
+                    llm,
+                    server_node,
+                )
+            # optimize and get results
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
+            del LMABO  # Free memory
+        elif acq_type in ["lmabo2", "lmabo2-ops"]:
+            from lmabo2 import LanguageModelAssistedAdaptiveBO2
+            if acq_type == "lmabo2":
+                llm = "api"
+            elif acq_type == "lmabo2-ops":
+                llm = "ops"
+            LMABO2 = LanguageModelAssistedAdaptiveBO2(                
                 objective_func, 
                 fixed_train_X, 
                 fixed_train_Y, 
@@ -162,9 +226,10 @@ def run_problem(
                 server_node,
             )
             # optimize and get results
-            simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
-            del LMABO  # Free memory
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
+            del LMABO2  # Free memory
         elif acq_type == "gphedge":
+            from bo import gp_hedge_full_loop
             # run GP-Hedge
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = gp_hedge_full_loop(
                 objective_func,
@@ -172,8 +237,40 @@ def run_problem(
                 fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
+            )   
+        elif acq_type == "bo_alternating":
+            from bo import bo_alternating_full_loop
+            # run alternating BO
+            simple_regret, cum_regret, train_X, train_Y = bo_alternating_full_loop(
+                objective_func,
+                fixed_train_X,
+                fixed_train_Y,
+                bounds,
+                num_iterations,
+                k
+            )
+        elif acq_type == "bo_explore_exploit":
+            from bo import bo_explore_exploit
+            # run explore-exploit BO
+            simple_regret, cum_regret, train_X, train_Y = bo_explore_exploit(
+                objective_func,
+                fixed_train_X,
+                fixed_train_Y,
+                bounds,
+                num_iterations,
+            )
+        elif acq_type == "bo_explore_exploit_with_probability":
+            from bo import bo_explore_exploit_with_probability
+            # run explore-exploit BO with probability
+            simple_regret, cum_regret, train_X, train_Y = bo_explore_exploit_with_probability(
+                objective_func,
+                fixed_train_X,
+                fixed_train_Y,
+                bounds,
+                num_iterations,
             )
         else:
+            from bo import bo_full_loop
             # run fixed acq_type
             simple_regret, cum_regret, train_X, train_Y = bo_full_loop(
                 objective_func, 
@@ -190,89 +287,11 @@ def run_problem(
             simple_regret=simple_regret, 
             cum_regret=cum_regret, 
             acq_type_list=acq_type_list,
+            choice_list=choice_list,
             messages=messages,
             weights=weights
         )
         del fixed_train_X, fixed_train_Y, train_X, train_Y  # Free memory
-
-def run_problem_constrained(
-    problem,
-    acq_type=None,
-    starting_exp_idx=0,
-):
-    print(f"Running {acq_type} on {device}")
-    # Experiment setup
-    objective_func, constraint_func, bounds, num_initial_points, num_iterations = setup_experiment(problem, constrained=True)
-    folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
-    os.makedirs(folder_path, exist_ok=True)
-    for exp_idx in range(starting_exp_idx, EXP_RUNS):
-        print(f"RUN {exp_idx}")
-        if torch.cuda.is_available():
-            torch.cuda.empty_cache()
-        if os.path.exists(f"{folder_path}/{exp_idx}_train_X.npy"):
-            print("Completed!")
-            continue
-        # Generate initial training data
-        fixed_train_X, fixed_train_Y, fixed_train_constraints = generate_initial_data(
-            bounds, 
-            num_initial_points, 
-            exp_idx, 
-            objective_func,
-            constrain_fuc=constraint_func
-        )
-        all_candidates = generate_candidates(
-            bounds, 
-            min(100000, 10000*bounds.shape[1]),  # Limit candidates to a reasonable number
-            exp_idx
-        )
-        acq_type_list, messages = None, None
-        # run constrained BO
-        if "lmabo" in acq_type:
-            from lmabo import LanguageModelAssistedAdaptiveConstrainedBO
-            # run LMABO
-            LMABO = LanguageModelAssistedAdaptiveConstrainedBO(
-                objective_func, 
-                constraint_func,
-                fixed_train_X, 
-                fixed_train_Y, 
-                fixed_train_constraints,
-                all_candidates,
-                bounds, 
-                num_iterations,
-            )
-            # optimize and get results
-            try:
-                train_X, train_Y, train_constraints, acq_type_list, messages = LMABO.optimize()
-                del LMABO
-            except Exception as e:
-                # print(f"Error during LMABO optimization: {e}")
-                raise e
-                continue
-        else:
-            train_X, train_Y, train_constraints = bo_constrained_full_loop(
-                objective_func,
-                constraint_func,
-                acq_type,
-                bounds,
-                fixed_train_X,
-                fixed_train_Y,
-                fixed_train_constraints,
-                num_iterations,
-                all_candidates
-            )
-        save_results(
-            folder_path,
-            exp_idx,
-            train_X,
-            train_Y,
-            simple_regret=None,  # No simple regret for constrained BO
-            cum_regret=None,  # No cumulative regret for constrained BO
-            acq_type_list=acq_type_list,
-            messages=messages,
-            weights=None,  # No weights for constrained BO
-            train_constraints=train_constraints,
-        )
-        del fixed_train_X, fixed_train_Y, train_X, train_Y, train_constraints  # Free memory
 
 def parse_arguments():
     """Parse command line arguments."""
@@ -280,10 +299,23 @@ def parse_arguments():
     parser.add_argument("--problem", type=str, default="Ackley", 
                        help="Function name to run optimization on")
     parser.add_argument("--method", type=str, default="bo",
-                       choices=["bo", "lmabo", "lmabo-ops", "gphedge"],
+                       choices=[
+                           "bo", 
+                           "lmabo", 
+                           "lmabo-ops", 
+                           "lmabo-ab1",
+                           "lmabo-ab2",
+                           "lmabo-ab3",
+                           "lmabo2",
+                           "lmabo2-ops",
+                           "gphedge", 
+                           "bo_alternating",
+                           "bo_explore_exploit",
+                           "bo_explore_exploit_with_probability"
+                       ],
                        help="Optimization method to use")
-    parser.add_argument("--constrained", action="store_true",
-                       help="Run constrained optimization")
+    parser.add_argument("--k", type=int, default=5,
+                       help="Number of iterations to run each acquisition function before switching")
     parser.add_argument("--server_node", type=str, default="localhost",
                        help="Server node for vLLM serving (if applicable)")
     parser.add_argument("--starting_exp_idx", type=int, default=0,
@@ -293,19 +325,20 @@ def parse_arguments():
 if __name__=="__main__":
     args = parse_arguments()
     starting_exp_idx = max(0, args.starting_exp_idx)
-    if args.constrained:
-        if args.method == "bo":
-            for acq_type in acq_type_mapping.keys():
-                run_problem_constrained(args.problem, acq_type, starting_exp_idx)
-        elif args.method in ["lmabo", "lmabo-ops"]:
-            run_problem_constrained(args.problem, args.method, starting_exp_idx)
-        elif args.method == "gphedge":
-            run_problem_constrained(args.problem, "gphedge", starting_exp_idx)
-    else:
-        if args.method == "bo":
-            for acq_type in acq_type_mapping.keys():
-                run_problem(args.problem, acq_type, starting_exp_idx)
-        elif args.method in ["lmabo", "lmabo-ops"]:
-            run_problem(args.problem, args.method, starting_exp_idx, args.server_node) 
-        elif args.method == "gphedge":
-            run_problem(args.problem, "gphedge", starting_exp_idx)
+    if args.method == "bo":
+        for acq_type in acq_type_mapping.keys():
+            run_problem(args.problem, acq_type, starting_exp_idx)
+    elif args.method in [
+        "lmabo", "lmabo-ops", 
+        "lmabo-ab1", "lmabo-ab2", "lmabo-ab3", 
+        "lmabo2", "lmabo2-ops"
+    ]:
+        run_problem(args.problem, args.method, starting_exp_idx, args.server_node) 
+    elif args.method == "gphedge":
+        run_problem(args.problem, "gphedge", starting_exp_idx)
+    elif args.method == "bo_alternating":
+        run_problem(args.problem, "bo_alternating", starting_exp_idx, k=args.k)
+    elif args.method == "bo_explore_exploit":
+        run_problem(args.problem, "bo_explore_exploit", starting_exp_idx)
+    elif args.method == "bo_explore_exploit_with_probability":
+        run_problem(args.problem, "bo_explore_exploit_with_probability", starting_exp_idx)

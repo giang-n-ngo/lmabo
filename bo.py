@@ -1,6 +1,6 @@
 import numpy as np
 import torch
-import random
+import math
 from botorch.test_functions import *
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
@@ -28,8 +28,6 @@ from gpytorch.mlls import ExactMarginalLogLikelihood
 from gpytorch.kernels import MaternKernel, ScaleKernel
 from torch.quasirandom import SobolEngine
 
-from constants import *
-
 # Set device (use GPU if available)
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 dtype = torch.double  # Use double precision for GP models
@@ -52,51 +50,6 @@ acq_type_mapping = {
     "qJES": "Joint Entropy Search"
 }
 MC_SAMPLES = 128
-
-def prepare_objective_func(problem):
-    for item in OBJECTIVE_FUNCTIONS:
-        if item.__name__ == problem:
-            f = item
-            break
-        elif hasattr(item, "name") and item.name == problem:
-            f = item
-            break
-    dim = 0
-    if f in DIMS:  
-        dim = DIMS[f]
-        objective_func = f(dim=dim).to(dtype=dtype, device=device)
-    else:
-        dim = f.dim
-        objective_func = f().to(dtype=dtype, device=device)
-    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
-    if problem == "Cosine8":
-        # Fix incorrect optimal value for Cosine8
-        objective_func._optimal_value = -8.8
-    return objective_func, dim, bounds
-
-def prepare_objective_func_constrained(problem):
-    for item in CONSTRAINED_OBJECTIVE_FUNCTIONS:
-        if item.__name__ == problem:
-            f = item
-            break
-        elif hasattr(item, "name") and item.name == problem:
-            f = item
-            break
-    dim = 0
-    if f in DIMS:  
-        dim = DIMS[f]
-        objective_func = f(dim=dim).to(dtype=dtype, device=device)
-    else:
-        objective_func = f().to(dtype=dtype, device=device)
-        dim = objective_func.dim
-    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
-    def constraint_func(X):
-        """
-        Evaluate the constraints at the given input X.
-        Returns a tensor of shape [num_samples, num_constraints].
-        """
-        return objective_func.evaluate_slack(X).to(dtype=dtype, device=device).squeeze(-1)
-    return objective_func, constraint_func, dim, bounds
 
 def calculate_auc_simple_regret(best_values, true_minimum):
     """
@@ -233,7 +186,7 @@ def _optimize_acqf(acq_type, acq_func, bounds):
         n_candidates = min(5000, max(2000, 200 * bounds.size(1)))
         sobol = SobolEngine(bounds.size(1), scramble=True)
         X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(n_candidates).to(dtype=dtype, device=device)
-        candidate = acq_func(X_cand, num_samples=4)
+        candidate = acq_func(X_cand, num_samples=1)
     elif acq_type == "qPES":
         n_candidates = min(1000, max(1000, 200 * bounds.size(1)))
         sobol = SobolEngine(bounds.size(1), scramble=True)
@@ -431,187 +384,6 @@ def optimize_acqf_discrete_qKG(
     candidate = choices[max_idx].unsqueeze(0)  # Get the candidate corresponding to
     
     return candidate
-
-def fit_gp_constrained(
-    train_X,
-    train_Y,
-    train_constraints,
-    flip
-):
-    # fit main objective GP
-    gp = fit_gp(train_X, train_Y*flip)
-    # fit constraint GPs
-    constraint_gps = fit_gp_list(
-        train_X, 
-        [
-            train_constraints[:, i].reshape(
-                (train_constraints.shape[0], 1)
-            ) for i in range(train_constraints.shape[1])
-        ]
-    )
-    return gp, constraint_gps
-
-def get_feasible_candidates(
-    constraint_gps,
-    all_candidates,
-    beta_t_sqrt=10.0,
-    return_sampling_flag=False
-):
-    """
-    Get feasible candidates based on the lower confidence bound of the constraints.
-    """
-    ucb_list = []
-    for constraint_gp in constraint_gps:
-        # Get lower confidence bound for the constraint
-        ucb = constraint_gp.posterior(all_candidates).mean + \
-            beta_t_sqrt * constraint_gp.posterior(all_candidates).variance.sqrt()
-        ucb_list.append(ucb.squeeze(-1))
-    ucb_list = torch.stack(ucb_list, dim=-1)  # Shape: [num_candidates, num_constraints]
-    
-    # Filter candidates that satisfy all constraints
-    feasible_candidates = all_candidates[(ucb_list >= 0).all(dim=-1)]
-    
-    if feasible_candidates.size(0) == 0:
-        # If no feasible candidates found, sample a random number of feasible candidates from the original candidates
-        selected_indices = random.sample(range(all_candidates.size(0)), 1000)
-        feasible_candidates = all_candidates[selected_indices, :]
-        print("No feasible candidates found in the current batch, sampling from all candidates.")
-    
-    if return_sampling_flag:
-        # Return the feasible candidates and a flag indicating that sampling was done
-        return feasible_candidates, True
-    # Otherwise, just return the feasible candidates
-    return feasible_candidates
-
-def optimize_acqf_and_evaluate_constrained(
-    acq_func,
-    bounds,
-    feasible_candidates,
-    objective_func,
-    constraint_func
-):
-    if acq_func.__class__.__name__ == "qKnowledgeGradient":
-        candidate = optimize_acqf_discrete_qKG(
-            bounds,
-            acq_func,
-            choices=feasible_candidates,
-            batch_size=1024
-        )
-    else:
-        candidate, _ = optimize_acqf_discrete(
-            acq_function=acq_func,
-            q=1,
-            choices=feasible_candidates,
-        )
-    # Evaluate the function and the constraints at the new point
-    new_Y = objective_func(candidate).unsqueeze(-1)
-    new_constraints = constraint_func(candidate).unsqueeze(-1)
-    return new_Y, new_constraints, candidate
-
-def bo_constrained_single_iteration(
-    objective_func,
-    constraint_func,
-    acq_type,
-    bounds,
-    train_X,
-    train_Y,
-    train_constraints,
-    feasible_candidates,
-    gp
-):
-    # fit main objective GP
-    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
-        flip = -1
-    else:
-        flip = 1
-    # Prepare acquisition function
-    acq_func = _prepare_acquisition_function(acq_type, bounds, train_X, train_Y, gp, flip)
-    # Optimize the acquisition function to find the next query point
-    new_Y, new_constraints, candidate = optimize_acqf_and_evaluate_constrained(
-        acq_func,
-        bounds,
-        feasible_candidates,
-        objective_func,
-        constraint_func
-    )
-    # Update the dataset
-    train_X = torch.cat([train_X, candidate])
-    train_Y = torch.cat([train_Y, new_Y])
-    train_constraints = torch.cat([train_constraints, new_constraints], dim=0)
-    # Fit the GPs again with the new data
-    gp, constraint_gps = fit_gp_constrained(
-        train_X, 
-        train_Y, 
-        train_constraints, 
-        flip
-    )
-    return train_X, train_Y, train_constraints, gp, constraint_gps
-
-def bo_constrained_full_loop(
-    objective_func,
-    constraint_func,
-    acq_type,
-    bounds,
-    X_init,
-    Y_init,
-    constraints_init,
-    num_iterations,
-    all_candidates
-):
-    """
-    Runs the full Bayesian Optimization loop for a constrained optimization problem.
-    """
-    # Generate initial training data
-    train_X = X_init.clone()
-    train_Y = Y_init.clone()
-    train_constraints = constraints_init.clone()
-
-    # Fit initial GPs
-    if acq_type in ["qKG", "TS", "qPES", "qMES", "qJES"]:
-        flip = -1
-    else:
-        flip = 1
-    gp, constraint_gps = fit_gp_constrained(
-        train_X, 
-        train_Y, 
-        train_constraints, 
-        flip
-    )
-
-    feasible_candidates = get_feasible_candidates(
-        constraint_gps=constraint_gps,  # No initial constraints GP
-        all_candidates=all_candidates,
-        beta_t_sqrt=(10*math.log(train_Y.shape[0]))**0.5
-    )
-    
-    for iteration_idx in range(num_iterations):
-        train_X, train_Y, train_constraints, gp, constraint_gps = bo_constrained_single_iteration(
-            objective_func,
-            constraint_func,
-            acq_type,
-            bounds,
-            train_X,
-            train_Y,
-            train_constraints,
-            feasible_candidates,
-            gp
-        )
-        feasible_candidates = get_feasible_candidates(
-            constraint_gps=constraint_gps,  # No initial constraints GP
-            all_candidates=all_candidates,
-            beta_t_sqrt=(10*math.log(train_Y.shape[0]))**0.5
-        )
-        if (train_constraints >= 0).all(dim=1).squeeze(-1).any():
-            best_feasible_value = train_Y[(train_constraints >= 0).all(dim=1).squeeze(-1)].min().item()
-        else:
-            best_feasible_value = "Not found"
-        print(f"Iter {iteration_idx} | Current best feasible value: {best_feasible_value}")
-    
-    return (
-        np.array(train_X.detach().cpu().numpy()), 
-        np.array(train_Y.detach().cpu().numpy()).flatten(),
-        np.array(train_constraints.detach().cpu().numpy())
-    )
 
 def bo_alternating_full_loop(objective_func, X_init, Y_init, bounds, num_iterations, k):
     """

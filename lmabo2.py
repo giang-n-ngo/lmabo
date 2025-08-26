@@ -5,7 +5,6 @@ from bo import (
     bo_single_iteration, 
     fit_gp, 
     calculate_cumulative_regret, 
-    acq_type_mapping
 )
 from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
@@ -86,7 +85,7 @@ class LanguageModelAssistedAdaptiveBO2:
         self.convo = ConversationHolder(
             llm, 
             first_prompt=INITIAL_PROMPT_CONTENT, 
-            full_acq_type_list=list(acq_type_mapping.keys()),
+            full_choice_list=["Exploration", "Exploitation"],
             server_node=server_node,
             default_choice="Exploration"  # Default acquisition function
         )

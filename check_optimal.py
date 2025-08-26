@@ -3,7 +3,7 @@ This script double checks the optimal value of the objective functions (100 repe
 """
 
 import torch
-from bo import prepare_objective_func
+from run import prepare_objective_func
 from torch.quasirandom import SobolEngine
 import random
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

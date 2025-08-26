@@ -303,12 +303,12 @@ class ConversationHolder:
         self,
         llm="api",
         first_prompt="",
-        full_acq_type_list=[],
+        full_choice_list=[],
         server_node="localhost",  # Default to localhost if not specified,
         default_choice="UCB"
     ):
         self.llm = llm
-        self.full_acq_type_list = full_acq_type_list
+        self.full_choice_list = full_choice_list
         self.messages = []
         if self.llm == "api":
             self.chat, initial_response = configure_and_start_chat_api(first_prompt)
@@ -319,7 +319,7 @@ class ConversationHolder:
         elif self.llm == "ops":
             self.chatbot = configure_and_start_chat_ops(first_prompt, server_node)
             self.messages.append(self.chatbot.history[-1]["content"])
-        self.default_choice = "Exploration"
+        self.default_choice = default_choice
 
     def _api_process_suggestion_response(self, response_text):
         """
@@ -338,7 +338,7 @@ class ConversationHolder:
             justification = justification.strip()
         else:
             response = response_text.strip()
-        if response not in self.full_acq_type_list:
+        if response not in self.full_choice_list:
             response = self.default_choice
             justification = "Nothing"
         print(f"LLM suggested AF: {response} justified by: {justification}")
@@ -418,7 +418,7 @@ class ConversationHolder:
         choice, justification = response_text.split(":", maxsplit=1)
 
         # Validate choice is in the allowed list
-        if choice not in self.full_acq_type_list:
+        if choice not in self.full_choice_list:
             print(f"Invalid choice '{choice}', using default '{self.default_choice}'")
             choice = self.default_choice
 
