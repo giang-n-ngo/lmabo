@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=48:00:00 
-#SBATCH --mem=32GB                    
-#SBATCH --cpus-per-gpu=16             
+#SBATCH --time=8:00:00 
+#SBATCH --mem=8GB                    
+#SBATCH --cpus-per-gpu=4             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -24,41 +24,41 @@ problems=(
     # "Beale" "Branin" "Bukin" 
     # "Cosine8" "DixonPrice" "DropWave" 
     # "EggHolder" "Griewank" "Hartmann" 
-    "HolderTable" "Levy" "Michalewicz" 
-    "Powell" "Rastrigin" "Rosenbrock" 
-    "Shekel" "SixHumpCamel" "StyblinskiTang" "Easom"
+    # "HolderTable" "Levy" "Michalewicz" # ablation
+    # "Powell" "Rastrigin" "Rosenbrock" # ablation
+    # "Shekel" "SixHumpCamel" "StyblinskiTang" "Easom" # ablation
     # COCO problems
-    "Sphere" "BucheRastrigin" "LinearSlope" 
-    "AttractiveSector" "StepEllipsoid" "RosenbrockRotated" 
-    "Ellipsoid2" "Discus" "BentCigar" "SharpRidge" 
+    # "Sphere" "BucheRastrigin" "LinearSlope" # ablation
+    # "AttractiveSector" "StepEllipsoid" "RosenbrockRotated" # ablation
+    # "Ellipsoid2" "Discus" "BentCigar" "SharpRidge" # ablation
     # "DifferentPowers" "Weierstrass" "Schaffers" 
     # "SchaffersIllCond" "CompositeGriewankRosenbrock" 
     # "Schwefel" "Gallagher21" "Gallagher101" "Katsuura" "LunacekBiRastrigin" 
-    # # HPT problems
-    # ## breast
-    # "hpt_breast_RandomForest"
-    # "hpt_breast_DecisionTree"
-    # "hpt_breast_SVM"
-    # "hpt_breast_AdaBoost"
-    # "hpt_breast_MLPSGD"
-    # ## digits
-    # "hpt_digits_RandomForest"
-    # "hpt_digits_DecisionTree"
-    # "hpt_digits_SVM"
-    # "hpt_digits_AdaBoost"
-    # "hpt_digits_MLPSGD"
-    # ## wines
-    # "hpt_wines_RandomForest"
-    # "hpt_wines_DecisionTree"
-    # "hpt_wines_SVM"
-    # "hpt_wines_AdaBoost"
-    # "hpt_wines_MLP_GD"
-    # ## diabetes
-    # "hpt_diabetes_RandomForest"
-    # "hpt_diabetes_DecisionTree"
-    # "hpt_diabetes_SVM"
-    # "hpt_diabetes_AdaBoost"
-    # "hpt_diabetes_MLPSGD"
+    # HPT problems
+    ## breast
+    "hpt_breast_RandomForest"
+    "hpt_breast_DecisionTree"
+    "hpt_breast_SVM"
+    "hpt_breast_AdaBoost"
+    "hpt_breast_MLPSGD"
+    ## digits
+    "hpt_digits_RandomForest"
+    "hpt_digits_DecisionTree"
+    "hpt_digits_SVM"
+    "hpt_digits_AdaBoost"
+    "hpt_digits_MLPSGD"
+    ## wine
+    "hpt_wine_RandomForest"
+    "hpt_wine_DecisionTree"
+    "hpt_wine_SVM"
+    "hpt_wine_AdaBoost"
+    "hpt_wine_MLPSGD"
+    ## diabetes
+    "hpt_diabetes_RandomForest"
+    "hpt_diabetes_DecisionTree"
+    "hpt_diabetes_SVM"
+    "hpt_diabetes_AdaBoost"
+    "hpt_diabetes_MLPSGD"
 )
 
 # Function to run problems in batches

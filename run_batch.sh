@@ -1,10 +1,10 @@
 #!/bin/bash
 
 methods=(
-    # "lmabo"
+    "lmabo"
     # "lmabo-ab1"
     # "lmabo-ab2"
-    "lmabo-ab3"
+    # "lmabo-ab3"
     # "lmabo2" 
     # "bo" 
     # "bo_alternating_k1"

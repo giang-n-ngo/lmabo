@@ -1,5 +1,6 @@
 # Code modified from https://github.com/tennisonliu/LLAMBO/tree/master
 
+import os
 import json
 import warnings
 import numpy as np
@@ -105,7 +106,9 @@ class BayesmarkExpRunner:
         '''
 
         # Read from fixed initialization points (all baselines see same init points)
-        init_configs = pd.read_json(f'test_functions/bayesmark_configs/{self.model}/{seed}.json').head(n_samples)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        json_fpath = os.path.join(current_dir, 'bayesmark_configs', f'{self.model}/{seed}.json')
+        init_configs = pd.read_json(json_fpath).head(n_samples)
         init_configs = init_configs.to_dict(orient='records')
 
         assert len(init_configs) == n_samples
@@ -165,12 +168,15 @@ def load_task_context(model, dataset, X_train, y_train):
     task_context['metric'] = TASK_MAP[dataset][1]
     task_context['lower_is_better'] = True if 'neg' in task_context['metric'] else False
     task_context['num_samples'] = X_train.shape[0]
-    with open('test_functions/bayesmark.json', 'r') as f:
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    json_fpath = os.path.join(current_dir, 'bayesmark.json')
+    with open(json_fpath, 'r') as f:
         task_context['hyperparameter_constraints'] = json.load(f)[model]
     return task_context
 
 def load_dataset(dataset_name):
-    pickle_fpath = f'test_functions/bayesmark_data/{dataset_name}.pickle'
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    pickle_fpath = os.path.join(current_dir, 'bayesmark_data', f'{dataset_name}.pickle')
     with open(pickle_fpath, 'rb') as f:
         data = pickle.load(f)
     return data
