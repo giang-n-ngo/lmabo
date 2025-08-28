@@ -61,6 +61,8 @@ def load_objective_func(problem, problem_type="botorch"):
         dim = f.dim
         objective_func = f()
     bounds = objective_func.bounds
+    assert len(bounds) == 2
+    assert len(bounds[0]) == dim
     if problem == "Cosine8":
         # Fix incorrect optimal value for Cosine8
         objective_func._optimal_value = -8.8

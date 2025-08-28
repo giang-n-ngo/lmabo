@@ -1,11 +1,11 @@
 import numpy as np
 
-from bo import (
+from baselines.bo_helpers import (
     bo_single_iteration, 
     fit_gp, 
     calculate_cumulative_regret, 
-    acq_type_mapping
 )
+from constants import ACQ_TYPE_MAPPING
 from llm_helper import ConversationHolder
 from utils import get_shortest_distance_from_last_point
 
@@ -227,7 +227,7 @@ class LanguageModelAssistedAdaptiveBO:
         self.convo = ConversationHolder(
             llm, 
             first_prompt=initial_prompt if initial_prompt is not None else INITIAL_PROMPT_LIST[0], 
-            full_choice_list=list(acq_type_mapping.keys()),
+            full_choice_list=list(ACQ_TYPE_MAPPING.keys()),
             server_node=server_node,
             default_choice="UCB"  # Default acquisition function
         )

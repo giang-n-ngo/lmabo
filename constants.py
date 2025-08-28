@@ -76,3 +76,18 @@ OBJECTIVE_FUNCTIONS_NAMES = \
     BOTORCH_FUNCTIONS_NAMES \
      + COCO_FUNCTIONS_NAMES \
      + HPT_FUNCTIONS_NAMES
+
+ACQ_TYPE_MAPPING = {
+    "PI": "Probability of Improvement",
+    "LogPI": "Log Probability of Improvement",
+    "EI": "Expected Improvement",
+    "LogEI": "Log Expected Improvement",
+    "UCB": "Upper Confidence Bound",
+    "PosMean": "Posterior Mean",
+    "PosSTD": "Posterior Standard Deviation",
+    "TS": "Thompson Sampling",
+    "qKG": "Knowledge Gradient",
+    "qPES": "Predictive Entropy Search",
+    "qMES": "Max-value Entropy Search",
+    "qJES": "Joint Entropy Search"
+}

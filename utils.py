@@ -4,12 +4,12 @@ import os
 import torch
 from scipy.stats import kstest
 
-from bo import acq_type_mapping
 from constants import (
     NUMERICAL_RESULTS_DIR, 
     EXP_RUNS, 
     FIG_DIR, 
     LLMGP_NUMERICAL_RESULTS_DIR,
+    ACQ_TYPE_MAPPING,
 )
 
 matplotlib_colors = [
@@ -82,7 +82,8 @@ def get_shortest_distance_from_last_point(X, bounds):
     # All other normalized points
     normalized_other_points = normalized_points[:-1, :]
 
-    # Calculate Euclidean distance between the normalized last point and each of the other normalized points
+    # Calculate Euclidean distance between the normalized last point 
+    # and each of the other normalized points
     # torch.cdist is efficient for batch distances
     # The output 'distances' will be a (N-1, 1) tensor
     distances = torch.cdist(normalized_other_points, normalized_last_point, p=2)
@@ -120,7 +121,7 @@ def get_auc(curve):
     """
     assert len(curve.shape)==1, "Wrong result shape"
     assert curve.shape[0] > 2, "Not enough elements to get AUC"
-    return np.trapezoid(curve.squeeze(), dx=1.0).item()  # Assuming uniform spacing of 1.0 between points
+    return np.trapezoid(curve.squeeze(), dx=1.0).item()  
 
 def read_raw_result(problem, acq_type, result_type):
     raw_result = []
@@ -159,8 +160,10 @@ def get_ranking(result, result_type):
         acq_type_values = result[acq_type]
         if len(acq_type_values) > 0:
             auc_acq_type[acq_type] = np.mean(acq_type_values).item()
+        elif result_type in ["simple_regret", "cum_regret", "log_hv_diff"]:
+            auc_acq_type[acq_type] = 1e50 
         else:
-            auc_acq_type[acq_type] = 1e50 if result_type in ["simple_regret", "cum_regret", "log_hv_diff"] else 0.0
+            auc_acq_type[acq_type] = 0.0
     if result_type in ["simple_regret", "cum_regret", "log_hv_diff"]:
         return get_rank_dict(auc_acq_type, False)
     else:
@@ -247,7 +250,7 @@ def report_relative_reg(
                 print(f"{method:<15} | {mean_auc_regrets[method]:>15.3f}(\u00B1{std_auc_regrets[method]:>15.3f}) | {'-':>2}{(1-rel_regret)*100:>7.1f}%")
     return sorted_performance
 
-def report_ranking_summary(problem_result, result_type, acq_type_list=list(acq_type_mapping.keys())):
+def report_ranking_summary(problem_result, result_type, acq_type_list=list(ACQ_TYPE_MAPPING.keys())):
     problem_ranking = {}
     for problem in problem_result.keys():
         problem_ranking[problem] = get_ranking(problem_result[problem], result_type)
@@ -268,7 +271,7 @@ def report_ranking_summary(problem_result, result_type, acq_type_list=list(acq_t
     
 def report_completion(
     problems, 
-    active_acq_type_list=list(acq_type_mapping.keys()), 
+    active_acq_type_list=list(ACQ_TYPE_MAPPING.keys()), 
     excepted_acq_type_list=[],
     constrained=False
 ):
@@ -338,7 +341,7 @@ def report_completion(
     print("Completed: ", completed_problems)
     return completed_problems
 
-def plot_results(problem_name, result_type, acq_type_list=list(acq_type_mapping.keys())):
+def plot_results(problem_name, result_type, acq_type_list=list(ACQ_TYPE_MAPPING.keys())):
     plt.figure(figsize=(16, 10))
     for i, acq_type in enumerate(acq_type_list):
         if result_type == "best_val":

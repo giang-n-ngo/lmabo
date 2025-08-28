@@ -22,10 +22,9 @@ args = argparser.parse_args()
 
 sys.stdout = open(f"report_{args.setting}.txt", 'w')
 if args.setting == "bo":
-    from bo import acq_type_mapping
-    from constants import OBJECTIVE_FUNCTIONS_NAMES
+    from constants import OBJECTIVE_FUNCTIONS_NAMES, ACQ_TYPE_MAPPING
 
-    active_acq_type_list = list(acq_type_mapping.keys())
+    active_acq_type_list = list(ACQ_TYPE_MAPPING.keys())
     active_acq_type_list += [
         "lmabo",
         "gphedge",
@@ -36,7 +35,7 @@ if args.setting == "bo":
         "bo_alternating_k3",
         "bo_alternating_k5",
         "bo_explore_exploit",
-        "bo_explore_exploit_with_probability",
+        # "bo_explore_exploit_with_probability",
     ]
     excepted_acq_type_list = [
         "lmabo2",

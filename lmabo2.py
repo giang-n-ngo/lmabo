@@ -1,7 +1,7 @@
 import numpy as np
 import random
 
-from bo import (
+from baselines.bo_helpers import (
     bo_single_iteration, 
     fit_gp, 
     calculate_cumulative_regret, 

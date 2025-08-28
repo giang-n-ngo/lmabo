@@ -1,13 +1,11 @@
-from bo import (
-    acq_type_mapping,
-)
 from constants import (
     EXP_RUNS, 
     NUMERICAL_RESULTS_DIR, 
     BOTORCH_FUNCTIONS_NAMES,
     COCO_FUNCTIONS_NAMES,
-    HPT_FUNCTIONS_NAMES
-)
+    HPT_FUNCTIONS_NAMES,
+    ACQ_TYPE_MAPPING
+)   
 from test_functions.test_function_loader import load_objective_func
 
 import argparse
@@ -229,17 +227,17 @@ def run_problem(
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
             del LMABO2  # Free memory
         elif acq_type == "gphedge":
-            from bo import gp_hedge_full_loop
+            from baselines.gp_hedge import gp_hedge_full_loop
             # run GP-Hedge
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = gp_hedge_full_loop(
                 objective_func,
-                list(acq_type_mapping.keys()),
+                list(ACQ_TYPE_MAPPING.keys()),
                 fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
             )   
         elif acq_type == "bo_alternating":
-            from bo import bo_alternating_full_loop
+            from baselines.bo import bo_alternating_full_loop
             # run alternating BO
             simple_regret, cum_regret, train_X, train_Y = bo_alternating_full_loop(
                 objective_func,
@@ -250,7 +248,7 @@ def run_problem(
                 k
             )
         elif acq_type == "bo_explore_exploit":
-            from bo import bo_explore_exploit
+            from baselines.bo import bo_explore_exploit
             # run explore-exploit BO
             simple_regret, cum_regret, train_X, train_Y = bo_explore_exploit(
                 objective_func,
@@ -260,7 +258,7 @@ def run_problem(
                 num_iterations,
             )
         elif acq_type == "bo_explore_exploit_with_probability":
-            from bo import bo_explore_exploit_with_probability
+            from baselines.bo import bo_explore_exploit_with_probability
             # run explore-exploit BO with probability
             simple_regret, cum_regret, train_X, train_Y = bo_explore_exploit_with_probability(
                 objective_func,
@@ -270,7 +268,7 @@ def run_problem(
                 num_iterations,
             )
         else:
-            from bo import bo_full_loop
+            from baselines.bo import bo_full_loop
             # run fixed acq_type
             simple_regret, cum_regret, train_X, train_Y = bo_full_loop(
                 objective_func, 
@@ -326,7 +324,7 @@ if __name__=="__main__":
     args = parse_arguments()
     starting_exp_idx = max(0, args.starting_exp_idx)
     if args.method == "bo":
-        for acq_type in acq_type_mapping.keys():
+        for acq_type in ACQ_TYPE_MAPPING.keys():
             run_problem(args.problem, acq_type, starting_exp_idx)
     elif args.method in [
         "lmabo", "lmabo-ops", 

@@ -196,7 +196,7 @@ def create_bayesmark_class(model, dataset):
                 constraints = task_context['hyperparameter_constraints'][hyperparam][-1]
                 self.lower_bounds.append(constraints[0])
                 self.upper_bounds.append(constraints[1])
-            self.bounds = [self.lower_bounds, self.upper_bounds]
+            self.bounds = torch.tensor([self.lower_bounds, self.upper_bounds])
             if task_context["lower_is_better"]:
                 self._optimal_value = BEST_PERFORMANCE[dataset]["global_min"]
             else:
