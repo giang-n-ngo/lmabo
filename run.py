@@ -153,10 +153,10 @@ def run_problem(
     print(f"Running {acq_type} on {device}")
     # Experiment setup
     objective_func, bounds, num_initial_points, num_iterations = setup_experiment(problem)
-    if k is None:
-        folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
-    else:
+    if acq_type == "bo_alternating":
         folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}_k{k}"
+    else:
+        folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq_type}"
     os.makedirs(folder_path, exist_ok=True)
     for exp_idx in range(starting_exp_idx, EXP_RUNS):
         print(f"RUN {exp_idx}")
@@ -209,7 +209,7 @@ def run_problem(
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
             del LMABO  # Free memory
         elif acq_type in ["lmabo2", "lmabo2-ops"]:
-            from lmabo2 import LanguageModelAssistedAdaptiveBO2
+            from lmabo import LanguageModelAssistedAdaptiveBO2
             if acq_type == "lmabo2":
                 llm = "api"
             elif acq_type == "lmabo2-ops":
@@ -236,6 +236,33 @@ def run_problem(
                 bounds,
                 num_iterations,
             )   
+        elif acq_type == "esp":
+            from baselines.esp import esp_full_loop
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list = esp_full_loop(
+                objective_func,
+                list(ACQ_TYPE_MAPPING.keys()),
+                fixed_train_X, fixed_train_Y,
+                bounds,
+                num_iterations,
+            )
+        elif acq_type == "no_past_bo":
+            from baselines.no_past_bo import no_past_bo_full_loop
+            simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = no_past_bo_full_loop(
+                objective_func,
+                list(ACQ_TYPE_MAPPING.keys()),
+                fixed_train_X, fixed_train_Y,
+                bounds,
+                num_iterations,
+            )
+        elif acq_type == "setup_bo":
+            from baselines.setup_bo import setup_bo_full_loop
+            simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = setup_bo_full_loop(
+                objective_func,
+                list(ACQ_TYPE_MAPPING.keys()),
+                fixed_train_X, fixed_train_Y,
+                bounds,
+                num_iterations,
+            )
         elif acq_type == "bo_alternating":
             from baselines.bo import bo_alternating_full_loop
             # run alternating BO
@@ -307,6 +334,9 @@ def parse_arguments():
                            "lmabo2",
                            "lmabo2-ops",
                            "gphedge", 
+                           "no_past_bo",
+                           "setup_bo",
+                           "esp",
                            "bo_alternating",
                            "bo_explore_exploit",
                            "bo_explore_exploit_with_probability"
@@ -326,17 +356,11 @@ if __name__=="__main__":
     if args.method == "bo":
         for acq_type in ACQ_TYPE_MAPPING.keys():
             run_problem(args.problem, acq_type, starting_exp_idx)
-    elif args.method in [
-        "lmabo", "lmabo-ops", 
-        "lmabo-ab1", "lmabo-ab2", "lmabo-ab3", 
-        "lmabo2", "lmabo2-ops"
-    ]:
-        run_problem(args.problem, args.method, starting_exp_idx, args.server_node) 
-    elif args.method == "gphedge":
-        run_problem(args.problem, "gphedge", starting_exp_idx)
-    elif args.method == "bo_alternating":
-        run_problem(args.problem, "bo_alternating", starting_exp_idx, k=args.k)
-    elif args.method == "bo_explore_exploit":
-        run_problem(args.problem, "bo_explore_exploit", starting_exp_idx)
-    elif args.method == "bo_explore_exploit_with_probability":
-        run_problem(args.problem, "bo_explore_exploit_with_probability", starting_exp_idx)
+    else:
+        run_problem(
+            args.problem,
+            acq_type=args.method, 
+            starting_exp_idx=starting_exp_idx,
+            server_node=args.server_node,
+            k=args.k
+        )

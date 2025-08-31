@@ -69,3 +69,4 @@ def load_objective_func(problem, problem_type="botorch"):
     if problem_type == "botorch":
         objective_func.name = problem
     return objective_func, dim, bounds
+    

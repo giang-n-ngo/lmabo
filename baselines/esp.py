@@ -1,98 +1,18 @@
 import torch
 import numpy as np
-import math
 from botorch.optim import optimize_acqf
-from botorch.acquisition import AcquisitionFunction
-from torch.distributions import StudentT, Uniform
+from botorch.generation.sampling import MaxPosteriorSampling
+from torch.quasirandom import SobolEngine
 
 from baselines.bo_helpers import (
     calculate_cumulative_regret,
-    fit_gp
+    fit_gp,
+    create_minimized_acquisition_function
 )
 from baselines.gp_hedge import _get_nominated_point_and_posterior_mean
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 DTYPE = torch.double
-
-class RandomFourierFeatureGP:
-    """
-    Approximates a GP with a Matérn(5/2) kernel using a Bayesian linear model
-    with Random Fourier Features, as described in Sec 3.2 and 4.1 of the paper.
-    """
-    def __init__(self, model, num_features: int = 1000):
-        self.model = model
-        self.train_x = model.train_inputs[0]
-        self.train_y = model.train_targets
-        self.m = num_features
-        
-        # Extract GP hyperparameters
-        self.outputscale = model.covar_module.outputscale.item()
-        self.lengthscale = model.covar_module.base_kernel.lengthscale.detach()
-        self.noise_var = model.likelihood.noise.item()
-        self.mean_const = model.mean_module.constant.item()
-        
-        d = self.train_x.shape[-1]
-        
-        # Sample weights W from the spectral density of the Matérn(5/2) kernel,
-        # which is a Student's-t distribution. [cite: 212]
-        t_dist = StudentT(df=5)
-        w_dist_inv_scale = torch.diag(self.lengthscale.squeeze() / math.sqrt(5))
-        self.W = t_dist.sample(torch.Size([self.m, d])).to(DEVICE, DTYPE) @ w_dist_inv_scale
-        
-        # Sample biases b from Uniform(0, 2*pi)
-        self.b = Uniform(0, 2 * math.pi).sample(torch.Size([self.m, 1])).to(DEVICE, DTYPE)
-
-        # Pre-compute matrices for weight posterior calculation
-        self._calculate_weight_posterior()
-
-    def _phi(self, X: torch.Tensor) -> torch.Tensor:
-        """Computes the random Fourier features for a given input X."""
-        # Phi(X) = sqrt(2*alpha/m) * cos(W*X^T + b)
-        proj = self.W @ X.transpose(-1, -2) + self.b
-        return math.sqrt(2 * self.outputscale / self.m) * torch.cos(proj).transpose(-1, -2)
-
-    def _calculate_weight_posterior(self):
-        """
-        Calculates the posterior distribution of the weights theta,
-        p(theta|D) ~ N(mu_theta, Sigma_theta), as per the paper. 
-        """
-        Phi = self._phi(self.train_x) # Shape (n_points x m_features)
-        
-        # A = Phi^T * Phi + sigma^2 * I
-        A = Phi.t() @ Phi + self.noise_var * torch.eye(self.m, device=DEVICE, dtype=DTYPE)
-        A_inv = torch.inverse(A)
-        
-        # Posterior mean: mu_theta = A^-1 * Phi^T * (y - mu_0)
-        self.mu_theta = A_inv @ Phi.t() @ (self.train_y - self.mean_const)
-        
-        # Posterior covariance: Sigma_theta = sigma^2 * A^-1
-        self.Sigma_theta = self.noise_var * A_inv
-
-    def sample_function(self) -> callable:
-        """
-        Draws one sample function from the approximate GP posterior.
-        The function is f(x) = phi(x)^T * theta + mu_0.
-        """
-        # Sample weights from the posterior: theta ~ N(mu_theta, Sigma_theta)
-        theta_sample = torch.distributions.MultivariateNormal(
-            self.mu_theta, self.Sigma_theta
-        ).sample()
-        
-        # Return a callable function
-        def f_sample(X):
-            return self._phi(X) @ theta_sample + self.mean_const
-            
-        return f_sample
-
-class SampledFunctionAcquisition(AcquisitionFunction):
-    """Simple wrapper to make an arbitrary callable optimizable by botorch."""
-    def __init__(self, model, fn: callable):
-        super().__init__(model)
-        self.fn = fn
-        
-    def forward(self, X: torch.Tensor) -> torch.Tensor:
-        # optimize_acqf maximizes, so we negate the function to find the minimum
-        return -self.fn(X.squeeze(-2)).unsqueeze(-1)
 
 class EntropySearchPortfolio:
     """
@@ -127,32 +47,21 @@ class EntropySearchPortfolio:
         self.N = num_hallucinated_observations
         self.S = num_fantasized_samples
 
-    def _get_representer_points(self) -> torch.Tensor:
+    def _get_representer_points(self, bounds: torch.Tensor) -> torch.Tensor:
         """
-        Generates representer points {z_i} by sampling from p(x*|D)
-        using the Random Fourier Features method from the paper. 
+        Generates representer points {z_i} by sampling from p(x*|D).
+        This is approximated by optimizing Thompson Sampling G times.
         """
-        rff_approximator = RandomFourierFeatureGP(self.model, num_features=self.num_rff_features)
         representers = []
-        
         for _ in range(self.G):
-            # 1. Sample a function from the posterior
-            f_sample = rff_approximator.sample_function()
-            
-            # 2. Wrap it in a BoTorch-compatible acquisition function
-            acqf_to_optimize = SampledFunctionAcquisition(self.model, f_sample)
-            
-            # 3. Optimize it to find the minimizer (by maximizing its negative)
-            z_i, _ = optimize_acqf(
-                acq_function=acqf_to_optimize,
-                bounds=self.bounds,
-                q=1,
-                num_restarts=10,
-                raw_samples=512
-            )
-            representers.append(z_i)
-        
-        return torch.cat(representers, dim=0)
+            sobol = SobolEngine(bounds.size(1), scramble=True)
+            X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(100).to(dtype=DTYPE, device=DEVICE)
+            ts_sampler = create_minimized_acquisition_function(MaxPosteriorSampling, self.model)
+            representer = ts_sampler(X_cand)
+            representers.append(representer)
+            del sobol, X_cand, ts_sampler
+        representers = torch.cat(representers, dim=0)
+        return representers.detach()
 
     def evaluate(self, bounds: torch.Tensor) -> torch.Tensor:
         """
@@ -193,7 +102,7 @@ class EntropySearchPortfolio:
                 
                 # Algorithm 2, Line 6: Draw S samples from the fantasy posterior 
                 f_kn_s = fantasy_posterior_at_z.sample(torch.Size([self.S])) # Shape (S x 1 x G)
-                f_kn_s = f_kn_s.squeeze(1) # Shape (S x G)
+                f_kn_s = f_kn_s.squeeze(-1) # Shape (S x G)
                 
                 # Algorithm 2, Line 7: Find the minimizer for each sample 
                 # Note: The objective is minimization
@@ -246,10 +155,10 @@ def esp_full_loop(
         candidates = []
         for acq_type in portfolio_acq_types:
             candidate, _ = _get_nominated_point_and_posterior_mean(
-                train_X=train_X,
-                train_Y=train_Y,
+                gp=gp,
                 acq_type=acq_type,
                 bounds=bounds,
+                best_f=best_values[-1]
             )
             candidates.append(candidate)
 

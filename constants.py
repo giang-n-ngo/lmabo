@@ -91,3 +91,22 @@ ACQ_TYPE_MAPPING = {
     "qMES": "Max-value Entropy Search",
     "qJES": "Joint Entropy Search"
 }
+
+ALGO_FILE_COUNT = {
+    "lmabo": 6,
+    "lmabo-ops": 6,
+    "lmabo-ab1": 6,
+    "lmabo-ab2": 6,
+    "lmabo-ab3": 6,
+    "gphedge": 6,
+    "no_past_bo": 6,
+    "setup_bo": 6,
+    "esp": 5,
+    # "lmabo2": 7,
+    "llmgp": 3,
+    "llambo": 3,
+    "bo_alternating_k1": 4,
+    "bo_alternating_k3": 4,
+    "bo_alternating_k5": 4,
+    "bo_explore_exploit": 4
+}

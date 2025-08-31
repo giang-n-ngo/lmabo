@@ -1,7 +1,6 @@
 import numpy as np
 import math
 import torch
-from torch import Tensor
 from botorch.models import SingleTaskGP
 from botorch.fit import fit_gpytorch_mll
 from botorch.models.transforms import Normalize, Standardize
@@ -22,19 +21,12 @@ from botorch.acquisition.joint_entropy_search import qJointEntropySearch
 from botorch.acquisition.max_value_entropy_search import qLowerBoundMaxValueEntropy
 from botorch.acquisition.utils import get_optimal_samples
 from botorch.generation.sampling import MaxPosteriorSampling
-from botorch.models.model import Model
 from botorch.optim import (
     optimize_acqf,
-    optimize_acqf_discrete
 )
-from botorch.sampling.pathwise.posterior_samplers import get_matheron_path_model
-from botorch.utils.sampling import optimize_posterior_samples
 from torch.quasirandom import SobolEngine
 from botorch.acquisition.objective import (
-    MCAcquisitionObjective,
-    PosteriorTransform,
     ScalarizedPosteriorTransform,
-    IdentityMCObjective
 )
 
 dtype = torch.double
@@ -152,13 +144,7 @@ def _optimize_acqf(acq_type, acq_func, bounds):
             "num_restarts": 10,
             "raw_samples": 512
         }
-        if acq_type == "qPES":
-            candidate, _ = optimize_acqf(
-                options={"with_grad": False},
-                **optimize_acqf_kwargs
-            )
-        else:
-            candidate, _ = optimize_acqf(**optimize_acqf_kwargs)
+        candidate, _ = optimize_acqf(**optimize_acqf_kwargs)
     return candidate
 
 def bo_single_iteration(

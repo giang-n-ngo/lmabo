@@ -28,6 +28,9 @@ if args.setting == "bo":
     active_acq_type_list += [
         "lmabo",
         "gphedge",
+        "esp",
+        "no_past_bo",
+        "setup_bo",
         "llmgp",
         "llambo",
         "lmabo-ops",
@@ -38,7 +41,7 @@ if args.setting == "bo":
         # "bo_explore_exploit_with_probability",
     ]
     excepted_acq_type_list = [
-        "lmabo2",
+        # "lmabo2",
         "lmabo-ab1",
         "lmabo-ab2",
         "lmabo-ab3"

@@ -10,6 +10,7 @@ from constants import (
     FIG_DIR, 
     LLMGP_NUMERICAL_RESULTS_DIR,
     ACQ_TYPE_MAPPING,
+    ALGO_FILE_COUNT
 )
 
 matplotlib_colors = [
@@ -146,12 +147,15 @@ def get_result_auc(problem, acq_type, result_type):
     result_auc = [get_auc(result) for result in raw_result]
     return result_auc
 
-def get_problem_result(problem_list, acq_type_list, result_type):
+def get_problem_result(problem_list, acq_type_list, result_type, agg="mean"):
     problem_result = {}
     for problem in problem_list:
         problem_result[problem] = {}
         for acq_type in acq_type_list:
-            problem_result[problem][acq_type] = get_result_auc(problem, acq_type, result_type)
+            if agg == "auc":
+                problem_result[problem][acq_type] = get_result_auc(problem, acq_type, result_type)
+            elif agg == "mean":
+                problem_result[problem][acq_type] = get_result_mean(problem, acq_type, result_type)
     return problem_result
 
 def get_ranking(result, result_type):
@@ -272,8 +276,7 @@ def report_ranking_summary(problem_result, result_type, acq_type_list=list(ACQ_T
 def report_completion(
     problems, 
     active_acq_type_list=list(ACQ_TYPE_MAPPING.keys()), 
-    excepted_acq_type_list=[],
-    constrained=False
+    excepted_acq_type_list=[]
 ):
     """
     Print a table showing number of completed runs for each problem and acquisition type.
@@ -304,29 +307,10 @@ def report_completion(
                 folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
             if not os.path.exists(folder_path):
                 count = 0
-            elif acq in [
-                "lmabo", 
-                "lmabo-ops",
-                "lmabo-ab1",
-                "lmabo-ab2",
-                "lmabo-ab3",
-                "lmamoo", 
-                "gphedge"
-            ]:
-                count = len([f for f in os.listdir(folder_path) 
-                            if f.endswith('.npy') or f.endswith('.txt')])
-                count = int(count//6)
-            elif acq == "lmabo2":
-                count = len([f for f in os.listdir(folder_path) 
-                            if f.endswith('.npy') or f.endswith('.txt')])
-                count = int(count//7)
-            elif acq == "llmgp" or acq == "llambo":
-                count = len([f for f in os.listdir(folder_path) if f.endswith('.npy')])
-                count = int(count//3)
             else:
                 count = len([f for f in os.listdir(folder_path)])
-                if constrained:
-                    count = int(count//3)
+                if acq in ALGO_FILE_COUNT.keys():
+                    count = int(count//ALGO_FILE_COUNT[acq])
                 else:
                    count = int(count//4)
             row += f"{count:^{acq_width}}|"
