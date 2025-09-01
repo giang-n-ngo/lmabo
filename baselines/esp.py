@@ -170,9 +170,9 @@ def esp_full_loop(
         esp_meta_policy = EntropySearchPortfolio(
             model=gp,
             candidates=candidates,
-            num_representer_points=20,
+            num_representer_points=10,
             num_hallucinated_observations=10,
-            num_fantasized_samples=20
+            num_fantasized_samples=10
         )
         
         next_point, idx = esp_meta_policy.evaluate(bounds=bounds)
