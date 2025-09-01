@@ -53,13 +53,14 @@ class EntropySearchPortfolio:
         This is approximated by optimizing Thompson Sampling G times.
         """
         representers = []
+        ts_sampler = create_minimized_acquisition_function(MaxPosteriorSampling, self.model)
         for _ in range(self.G):
             sobol = SobolEngine(bounds.size(1), scramble=True)
-            X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(100).to(dtype=DTYPE, device=DEVICE)
-            ts_sampler = create_minimized_acquisition_function(MaxPosteriorSampling, self.model)
+            X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(20).to(dtype=DTYPE, device=DEVICE)
             representer = ts_sampler(X_cand)
             representers.append(representer)
-            del sobol, X_cand, ts_sampler
+            del sobol, X_cand
+        del ts_sampler
         representers = torch.cat(representers, dim=0)
         return representers.detach()
 
@@ -169,9 +170,9 @@ def esp_full_loop(
         esp_meta_policy = EntropySearchPortfolio(
             model=gp,
             candidates=candidates,
-            num_representer_points=50,
+            num_representer_points=20,
             num_hallucinated_observations=10,
-            num_fantasized_samples=100
+            num_fantasized_samples=20
         )
         
         next_point, idx = esp_meta_policy.evaluate(bounds=bounds)

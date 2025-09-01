@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=48:00:00 
+#SBATCH --time=24:00:00 
 #SBATCH --mem=40GB                    
 #SBATCH --cpus-per-gpu=18             
 #SBATCH --qos=batch-short
@@ -26,12 +26,12 @@ problems=(
     "HolderTable" "Levy" "Michalewicz" 
     "Powell" "Rastrigin" "Rosenbrock" 
     "Shekel" "SixHumpCamel" "StyblinskiTang" "Easom" 
-    "Sphere" "BucheRastrigin" "LinearSlope" 
-    "AttractiveSector" "StepEllipsoid" "RosenbrockRotated" 
-    "Ellipsoid2" "Discus" "BentCigar" "SharpRidge" 
-    "DifferentPowers" "Weierstrass" "Schaffers" 
-    "SchaffersIllCond" "CompositeGriewankRosenbrock" 
-    "Schwefel" "Gallagher21" "Gallagher101" "Katsuura" "LunacekBiRastrigin" 
+    # "Sphere" "BucheRastrigin" "LinearSlope" 
+    # "AttractiveSector" "StepEllipsoid" "RosenbrockRotated" 
+    # "Ellipsoid2" "Discus" "BentCigar" "SharpRidge" 
+    # "DifferentPowers" "Weierstrass" "Schaffers" 
+    # "SchaffersIllCond" "CompositeGriewankRosenbrock" 
+    # "Schwefel" "Gallagher21" "Gallagher101" "Katsuura" "LunacekBiRastrigin" 
     # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
     # "hpt_breast_SVM"

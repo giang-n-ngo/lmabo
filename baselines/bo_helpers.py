@@ -29,6 +29,10 @@ from botorch.acquisition.objective import (
     ScalarizedPosteriorTransform,
 )
 
+# Suppress warnings
+import warnings
+warnings.filterwarnings("ignore")
+
 dtype = torch.double
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

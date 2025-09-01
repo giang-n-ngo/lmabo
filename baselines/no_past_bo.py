@@ -65,6 +65,18 @@ def no_past_bo_full_loop(
         acquisition_function_weights_history.append(probabilities.cpu().numpy())
 
         # Randomly select one acquisition function's nominee based on these probabilities
+        # Check for invalid values and fix them
+        probabilities = torch.clamp(probabilities, min=1e-8)  # Ensure positive values
+        probabilities = torch.nan_to_num(probabilities, nan=1e-8, posinf=1e8, neginf=1e-8)  # Handle NaN/inf
+
+        # Normalize to ensure they sum to 1
+        probabilities = probabilities / probabilities.sum()
+
+        # Add final safety check
+        if torch.any(torch.isnan(probabilities)) or torch.any(torch.isinf(probabilities)) or torch.any(probabilities < 0):
+            # Fallback to uniform distribution if still invalid
+            probabilities = torch.ones_like(probabilities) / len(probabilities)
+
         selected_index = torch.multinomial(probabilities, 1).item()
         x_t = nominated_points[selected_index]
         acq_type_list.append(portfolio_acq_types[selected_index])

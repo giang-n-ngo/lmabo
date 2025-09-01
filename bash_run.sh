@@ -5,17 +5,15 @@ methods=(
     # "lmabo-ab1"
     # "lmabo-ab2"
     # "lmabo-ab3"
-    # "lmabo2" 
     # "bo" 
     # "gphedge"
     # "esp"
-    "no_past_bo"
+    # "no_past_bo"
     "setup_bo"
     # "bo_alternating_k1"
     # "bo_alternating_k3"
     # "bo_alternating_k5"
     # "bo_explore_exploit" 
-    # "bo_explore_exploit_with_probability" 
 )
 
 # Loop over each problem and algorithm

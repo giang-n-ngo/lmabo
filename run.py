@@ -85,13 +85,12 @@ def prepare_objective_func(problem):
     objective_func, dim, bounds = load_objective_func(problem, problem_type)
     if problem_type != "hpt":
         objective_func = objective_func.to(dtype=dtype, device=device)
-    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
+    bounds = objective_func.bounds.clone().detach().to(dtype=dtype, device=device)
     return objective_func, dim, bounds
 
 def setup_experiment(problem):
     """Common setup for main experiments."""
     objective_func, dim, bounds = prepare_objective_func(problem)
-    bounds = torch.tensor(objective_func.bounds, dtype=dtype, device=device)
     if problem[:4] == "hpt_":
         config = ExperimentConfigHPT()
         num_initial_points = config.num_initial_points

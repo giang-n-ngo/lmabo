@@ -150,10 +150,6 @@ class BayesmarkExpRunner:
         model.fit(X_train, y_train)
         generalization_score = scorer(model, X_test, y_test)
 
-        if self.metric == 'neg_mean_squared_error':
-            cv_score = -cv_score
-            generalization_score = -generalization_score
-
         return candidate_config, {'score': cv_score, 'generalization_score': generalization_score}
 
 def load_task_context(model, dataset, X_train, y_train):
