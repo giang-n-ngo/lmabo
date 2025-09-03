@@ -2,8 +2,8 @@
 
 methods=(
     # "lmabo"
-    # "lmabo-ab1"
-    "lmabo-ab2"
+    "lmabo-ab1"
+    # "lmabo-ab2"
     # "lmabo-ab3"
     # "bo" 
     # "gphedge"
