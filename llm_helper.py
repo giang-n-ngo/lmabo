@@ -101,7 +101,7 @@ class QwenChatbot:
                 api_key=openai_api_key,
                 base_url=openai_api_base,
             )
-            print("Using hosted vLLM API at localhost:8000")
+            print(f"Using hosted vLLM API at {server_node}:8000")
         else:
             from vllm import LLM, SamplingParams
             # Initialize vLLM with optimized settings

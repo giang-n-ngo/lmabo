@@ -170,6 +170,9 @@ if __name__=="__main__":
     all_problems = OBJECTIVE_FUNCTIONS_NAMES
     # exclude some methods during the main report
     excluded_methods = [
+        # "no_past_bo",
+        # "setup_bo",
+        # "esp"
         "lmabo-ops", # ablation method
         "bo_alternating_k1", # ablation method
         "bo_alternating_k3", # ablation method
@@ -178,9 +181,6 @@ if __name__=="__main__":
         "lmabo-ab1", # ablation method
         "lmabo-ab2", # ablation method
         "lmabo-ab3", # ablation method
-        "no_past_bo",
-        "setup_bo",
-        "esp"
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
