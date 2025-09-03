@@ -24,7 +24,7 @@ def _get_nominated_point_and_posterior_mean(
     """
     acq_func = _prepare_acquisition_function(acq_type, bounds, best_f, gp)
     # Optimize the acquisition function
-    candidate = _optimize_acqf(acq_type, acq_func, bounds)
+    candidate = _optimize_acqf(acq_type, acq_func, bounds, True)
 
     # Get the posterior mean at the nominated point
     posterior = gp.posterior(candidate)
