@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=48:00:00 
-#SBATCH --mem=24GB                    
-#SBATCH --cpus-per-gpu=24             
+#SBATCH --time=1:00:00 
+#SBATCH --mem=6GB                    
+#SBATCH --cpus-per-gpu=4             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -46,19 +46,19 @@ problems=(
     # "StepEllipsoid" 
     # "RosenbrockRotated" 
     # "Ellipsoid2" 
-    "Discus" 
-    "BentCigar" 
-    "SharpRidge" 
-    "DifferentPowers" 
-    "Weierstrass" 
-    "Schaffers" 
-    "SchaffersIllCond" 
-    "CompositeGriewankRosenbrock" 
-    "Schwefel" 
-    "Gallagher21" 
-    "Gallagher101" 
-    "Katsuura" 
-    "LunacekBiRastrigin" 
+    # "Discus" 
+    # "BentCigar" 
+    # "SharpRidge" 
+    # "DifferentPowers" 
+    # "Weierstrass" 
+    # "Schaffers" 
+    # "SchaffersIllCond" 
+    # "CompositeGriewankRosenbrock" 
+    # "Schwefel" 
+    # "Gallagher21" 
+    # "Gallagher101" 
+    # "Katsuura" 
+    # "LunacekBiRastrigin" 
     # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
     # "hpt_breast_SVM"
@@ -78,7 +78,7 @@ problems=(
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
     # "hpt_diabetes_AdaBoost"
-    # "hpt_diabetes_MLPSGD"
+    "hpt_diabetes_MLPSGD"
 )
 
 # Function to run problems in batches

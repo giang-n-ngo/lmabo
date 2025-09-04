@@ -1,15 +1,10 @@
-import argparse
 import numpy as np
 import pandas as pd
+import os
 import sys
 
 from utils import (
     report_completion,
-    report_ranking_summary,
-    plot_results,
-    report_relative_reg,
-    print_sorted_dict,
-    get_problem_result
 )
 
 from constants import (
@@ -69,8 +64,8 @@ def find_best_result_per_problem(result_by_all_methods):
                 best_result = result
     return best_result
 
-def load_results_and_empirical_performance(problem_list, method_list, result_type):
-    all_raw_results = get_all_problem_raw_result(problem_list, method_list, result_type)
+def load_results_and_empirical_performance(problem_list, method_list):
+    all_raw_results = get_all_problem_raw_result(problem_list, method_list, "train_Y")
     empirical_optimum = {}
     for problem, problem_raw_results in all_raw_results.items():
         minimum_value = float("inf")
@@ -142,7 +137,7 @@ def get_relative_performance_and_rank(agg_simple_regrets_df, problem_list):
         best_sum = rel_performance_df.loc[rel_performance_df["problem"] == problem, "sum"].min()
         rel_performance_df.loc[rel_performance_df["problem"] == problem, "relative_performance"] = rel_performance_df["sum"] / best_sum
         # get problem-wise ranking
-        rel_performance_df.loc[rel_performance_df["problem"] == problem, "problem_rank"] = rel_performance_df["relative_performance"].rank(method="min")
+        rel_performance_df.loc[rel_performance_df["problem"] == problem, "problem_rank"] = rel_performance_df.loc[rel_performance_df["problem"] == problem, "relative_performance"].rank(method="min")
     return rel_performance_df
 
 def summary_by_method(rel_performance_df):
@@ -153,6 +148,8 @@ def summary_by_method(rel_performance_df):
     summary_df_2 = rel_performance_df.groupby("method")["problem_rank"].mean().reset_index()
     # Merge two df
     summary_df = pd.merge(summary_df_1, summary_df_2, on="method", suffixes=("_performance", "_rank"))
+    # sort by mean
+    summary_df = summary_df.sort_values(by="mean")
     return summary_df
 
 def rank_methods_by_problem(rel_performance_df, problem):
@@ -172,7 +169,7 @@ if __name__=="__main__":
     excluded_methods = [
         # "no_past_bo",
         # "setup_bo",
-        # "esp"
+        # "esp",
         "lmabo-ops", # ablation method
         "bo_alternating_k1", # ablation method
         "bo_alternating_k3", # ablation method
@@ -192,11 +189,12 @@ if __name__=="__main__":
     completed_problems = report_completion(problems, all_methods, excluded_methods)
     print(f"Completed {len(completed_problems)} problems out of {len(problems)}")
 
-    all_raw_results, empirical_optimum = load_results_and_empirical_performance(all_problems, all_methods, "train_Y")
+    all_raw_results, empirical_optimum = load_results_and_empirical_performance(
+        all_problems, 
+        all_methods
+    )
     all_simple_regrets = cal_simple_regret(all_raw_results, empirical_optimum)
     agg_simple_regrets_df = aggregate_and_to_df(all_simple_regrets, "auc")
-    completed_problems = list_completed_problems(agg_simple_regrets_df)
-    print("Completed problems: ", completed_problems)
     rel_performance_df = get_relative_performance_and_rank(agg_simple_regrets_df, completed_problems)
     summary_df = summary_by_method(rel_performance_df)
     print(summary_df.to_string(index=False))
