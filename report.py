@@ -2,6 +2,8 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+from scipy import stats
+from statsmodels.stats.multitest import multipletests
 
 from utils import (
     report_completion,
@@ -203,12 +205,11 @@ method_name_mapping = {
     "lmabo": "LMABO",
 }
 
-def get_median_iqr_summary(rel_performance_df):
+def get_median_iqr_summary(rel_performance_df, method_name_mapping=None):
     # rel_performance_df: columns: method, problem, relative_performance, problem_rank
-    # For each method, compute the median and IQR (Q1 and Q3) of relative_performance across problems
-    # Also for each method, compute the mean, min, and max rank across problems
-    # Along with the number of times a method is the best (rank 1) across problems
-    # Return a summary dataframe 
+    if method_name_mapping is None:
+        method_name_mapping = {}
+
     gp = rel_performance_df.groupby("method")
     median = gp["relative_performance"].median()
     q1 = gp["relative_performance"].quantile(0.25)
@@ -231,74 +232,155 @@ def get_median_iqr_summary(rel_performance_df):
         "n": n.values,
     }).set_index("method")
 
-    # Map internal method keys to display names using method_name_mapping.
-    # If a method key is not in the mapping, keep it as-is.
-    summary_df.index = [method_name_mapping.get(m, m) for m in summary_df.index]
+    # Add a display_name column using the provided mapping (keep internal keys as index)
+    summary_df["display_name"] = [method_name_mapping.get(m, m) for m in summary_df.index]
 
     return summary_df
 
-
-def summary_to_latex(summary_df, filename="summary.tex", methods_order=None, method_name_mapping=None):
-    """
-    Write a LaTeX table where each row corresponds to a method in methods_order.
-    summary_df is indexed by method (either internal keys or display names) and must have columns:
-      median, Q1, Q3, mean_rank, min_rank, max_rank, best_count, n
-
-    - methods_order: list of internal method keys in the desired order.
-    - method_name_mapping: dict mapping internal method keys -> display names.
-    """
-    if methods_order is None:
-        methods_order = list(summary_df.index)
+def summary_to_latex(summary_df, filename="summary.tex", methods_order=None, method_name_mapping=None, pairwise_p_rel=None, pairwise_p_rank=None):
     if method_name_mapping is None:
         method_name_mapping = {}
 
+    # Ensure methods_order is a list of internal method keys in desired order
+    if methods_order is None:
+        methods_order = list(summary_df.index)
+    else:
+        # keep order but only include those present; append missing methods present in summary_df
+        ordered = [m for m in methods_order if m in summary_df.index]
+        ordered += [m for m in summary_df.index if m not in ordered]
+        methods_order = ordered
+
+    # header/footer unchanged
     header = r"""\begin{table}[t]
-\caption{Performance comparison across all benchmark problems. LMABO demonstrates superior performance with the best median relative performance and mean rank. Bold values indicate the best performance in each metric.}
+\caption{Performance comparison across all benchmark problems. Bold values indicate the best performance in each metric.}
 \label{tab:aggregated}
 \centering
 \renewcommand{\arraystretch}{1.2}
-\begin{tabular}{@{}lccr@{}}
+\begin{tabular}{@{}lccrr@{}}
 \toprule
-\multirow{2}{*}{\textbf{Method}} & \multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}\textbf{Median relative performance} \\ \textbf{(Interquartile Range)}\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}\textbf{Mean rank} \\ \textbf{(Min--Max)}\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}\textbf{\#1st} \\ \textbf{ranks}\end{tabular}} \\
-& & & \\
-\midrule
-\multicolumn{4}{l}{\textit{Static Acquisition Functions}} \\
+\textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Median relative} \\ \textbf{performance (IQR)}\end{tabular} & \textbf{Mean rank (Min--Max)} & \textbf{p (rel, Holm)} & \textbf{p (rank, Holm)} \\
 \midrule
 """
-    footer = r"""\hline
-\bottomrule
+    footer = r"""\bottomrule
 \end{tabular}
 \end{table}
 """
     rows = []
     for m in methods_order:
-        display = method_name_mapping.get(m, m)
-        # Try to find the row by internal key first, otherwise by display name
-        if m in summary_df.index:
-            row = summary_df.loc[m]
-        elif display in summary_df.index:
-            row = summary_df.loc[display]
-        else:
-            rows.append(f"{display} & -- & -- & 0 \\\\")
+        display = method_name_mapping.get(m, summary_df.loc[m]["display_name"] if m in summary_df.index else m)
+        if m not in summary_df.index:
+            rows.append(f"{display} & -- & -- & -- & -- \\\\")
             continue
 
+        row = summary_df.loc[m]
         med = row["median"]
         q1 = row["Q1"]
         q3 = row["Q3"]
         mean_r = row["mean_rank"]
         min_r = int(row["min_rank"])
         max_r = int(row["max_rank"])
-        best = int(row["best_count"])
 
-        # Remove 'n' from the performance string per request
         perf_str = f"{med:.3f} ({q1:.3f}--{q3:.3f})"
-        rank_str = f"{mean_r:.2f} ({min_r} - {max_r})"
-        rows.append(f"{display} & {perf_str} & {rank_str} & {best} \\\\")
+        rank_str = f"{mean_r:.2f} ({min_r}--{max_r})"
+
+        p_rel = (pairwise_p_rel.get(m) if pairwise_p_rel is not None else None)
+        p_rank = (pairwise_p_rank.get(m) if pairwise_p_rank is not None else None)
+        p_rel_str = f"{p_rel:.3e}" if p_rel is not None else "--"
+        p_rank_str = f"{p_rank:.3e}" if p_rank is not None else "--"
+
+        rows.append(f"{display} & {perf_str} & {rank_str} & {p_rel_str} & {p_rank_str} \\\\")
 
     table = header + "\n".join(rows) + "\n" + footer
     with open(filename, "w") as f:
         f.write(table)
     print(f"Wrote LaTeX summary to {filename}")
+
+
+def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, methods_order=None, control_method="lmabo"):
+    """
+    Perform Friedman omnibus and pairwise Wilcoxon tests on:
+      - relative_performance (numeric)
+      - problem_rank (ranks)
+    Returns dictionaries of Holm-corrected p-values for pairwise comparisons (control vs others),
+    indexed by internal method key.
+    """
+    # filter to completed problems and drop any NaNs
+    relp = rel_performance_df[rel_performance_df["problem"].isin(completed_problems)].copy()
+    relp = relp.dropna(subset=["relative_performance", "problem_rank"])
+    # pivot to matrices
+    pivot_rel = relp.pivot(index="problem", columns="method", values="relative_performance")
+    pivot_rank = relp.pivot(index="problem", columns="method", values="problem_rank")
+
+    # keep problems that have all methods present
+    pivot_rel = pivot_rel.dropna(axis=0, how="any")
+    pivot_rank = pivot_rank.loc[pivot_rel.index]  # align
+
+    available_methods = list(pivot_rel.columns)
+    if methods_order is None:
+        methods = available_methods
+    else:
+        methods = [m for m in methods_order if m in available_methods]
+        methods += [m for m in available_methods if m not in methods]
+
+    pivot_rel = pivot_rel[methods]
+    pivot_rank = pivot_rank[methods]
+
+    # Friedman on relative performance: prepare arrays per method
+    args_rel = [pivot_rel[method].values for method in methods]
+    friedman_stat_rel, friedman_p_rel = stats.friedmanchisquare(*args_rel)
+
+    # Friedman on ranks (though ranks are already ranks, still valid)
+    args_rank = [pivot_rank[method].values for method in methods]
+    friedman_stat_rank, friedman_p_rank = stats.friedmanchisquare(*args_rank)
+
+    # Ensure control method exists (case-insensitive fallback)
+    if control_method not in methods:
+        cands = [m for m in methods if m.lower() == control_method.lower()]
+        if cands:
+            control_method = cands[0]
+    if control_method not in methods:
+        raise ValueError(f"Control method '{control_method}' not found among available methods: {methods}")
+
+    control_rel = pivot_rel[control_method].values
+    control_rank = pivot_rank[control_method].values
+
+    # Pairwise Wilcoxon (control vs each other) on relative performance and on ranks
+    pairwise = []
+    for m in methods:
+        if m == control_method:
+            continue
+        other_rel = pivot_rel[m].values
+        other_rank = pivot_rank[m].values
+        try:
+            _, p_rel = stats.wilcoxon(control_rel, other_rel, alternative="two-sided", zero_method="wilcox", mode="approx")
+        except Exception:
+            p_rel = 1.0
+        try:
+            _, p_rank = stats.wilcoxon(control_rank, other_rank, alternative="two-sided", zero_method="wilcox", mode="approx")
+        except Exception:
+            p_rank = 1.0
+        pairwise.append((m, float(p_rel), float(p_rank)))
+
+    pairwise_df = pd.DataFrame(pairwise, columns=["method", "p_rel_unc", "p_rank_unc"]).set_index("method")
+
+    # Holm correction separately
+    pvals_rel = pairwise_df["p_rel_unc"].values
+    rej_rel, pvals_rel_holm, _, _ = multipletests(pvals_rel, alpha=0.05, method="holm")
+    pairwise_df["p_rel_holm"] = pvals_rel_holm
+    pairwise_df["reject_rel"] = rej_rel
+
+    pvals_rank = pairwise_df["p_rank_unc"].values
+    rej_rank, pvals_rank_holm, _, _ = multipletests(pvals_rank, alpha=0.05, method="holm")
+    pairwise_df["p_rank_holm"] = pvals_rank_holm
+    pairwise_df["reject_rank"] = rej_rank
+
+    # return friedman results and pairwise dataframe
+    friedman_res = {
+        "rel": {"stat": float(friedman_stat_rel), "p": float(friedman_p_rel)},
+        "rank": {"stat": float(friedman_stat_rank), "p": float(friedman_p_rank)},
+    }
+
+    return {"friedman": friedman_res, "pairwise": pairwise_df, "methods": methods}
 
 if __name__=="__main__":
     sys.stdout = open(f"report_bo.txt", 'w')
@@ -343,13 +425,52 @@ if __name__=="__main__":
     # for problem in completed_problems:
     #     rank_methods_by_problem(rel_performance_df, problem)
     #     print("="*200)
-    summary_df = get_median_iqr_summary(rel_performance_df)
-    summary_to_latex(
-        summary_df, 
-        filename="summary.tex", 
-        methods_order=methods_order, 
-        method_name_mapping=method_name_mapping
-    )
+    summary_df = get_median_iqr_summary(rel_performance_df, method_name_mapping)
+
+    # Run statistical tests on relative performance and ranks using rel_performance_df.
+    completed_for_stats = list_completed_problems(agg_simple_regrets_df)
+    print(f"Using {len(completed_for_stats)} fully-completed problems for statistical tests")
+
+    try:
+        if len(completed_for_stats) == 0:
+            raise RuntimeError("No fully-completed problems available for statistical testing.")
+
+        # run tests on rel_performance_df filtered to completed problems
+        stats_res = run_stats_on_rel_perf_and_ranks(
+            rel_performance_df,
+            completed_problems=completed_for_stats,
+            methods_order=methods_order,
+            control_method="lmabo",
+        )
+
+        # print Friedman omnibus results
+        print("Friedman tests:")
+        print(f"  Relative performance: chi2 = {stats_res['friedman']['rel']['stat']:.3f}, p = {stats_res['friedman']['rel']['p']:.3e}")
+        print(f"  Ranks:                chi2 = {stats_res['friedman']['rank']['stat']:.3f}, p = {stats_res['friedman']['rank']['p']:.3e}")
+
+        pairwise_df = stats_res["pairwise"]
+        # pairwise_df indexed by method and contains p_rel_holm and p_rank_holm
+        print("\nPairwise (control=lmabo) Holm-corrected p-values:")
+        print(pairwise_df[["p_rel_holm", "p_rank_holm"]].to_string(float_format=lambda x: f"{x:.3e}"))
+
+        # prepare dicts for latex table (map internal method -> corrected p)
+        pairwise_p_rel = pairwise_df["p_rel_holm"].to_dict()
+        pairwise_p_rank = pairwise_df["p_rank_holm"].to_dict()
+
+        # regenerate LaTeX table including p-values
+        summary_to_latex(
+            summary_df,
+            filename="summary.tex",
+            methods_order=methods_order,
+            method_name_mapping=method_name_mapping,
+            pairwise_p_rel=pairwise_p_rel,
+            pairwise_p_rank=pairwise_p_rank,
+        )
+
+        # # optional: save pairwise table for inspection
+        # pairwise_df.to_csv("pairwise_holm_pvalues.csv")
+    except Exception as e:
+        print(f"Statistical testing failed: {e}")
 
     # Don't forget to close the file
     sys.stdout.close()

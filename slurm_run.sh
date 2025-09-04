@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=1:00:00 
-#SBATCH --mem=6GB                    
-#SBATCH --cpus-per-gpu=4             
+#SBATCH --time=36:00:00 
+#SBATCH --mem-per-cpu=4G                    
+#SBATCH --cpus-per-gpu=12             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -24,7 +24,7 @@ problems=(
     # "Branin" 
     # "Bukin" 
     # "Cosine8" 
-    # "DixonPrice" 
+    "DixonPrice" 
     # "DropWave" 
     # "EggHolder" 
     # "Griewank" 
@@ -37,7 +37,7 @@ problems=(
     # "Rosenbrock" 
     # "Shekel" 
     # "SixHumpCamel" 
-    # "StyblinskiTang" 
+    "StyblinskiTang" 
     # "Easom" 
     # "Sphere" 
     # "BucheRastrigin" 
@@ -58,7 +58,7 @@ problems=(
     # "Gallagher21" 
     # "Gallagher101" 
     # "Katsuura" 
-    # "LunacekBiRastrigin" 
+    "LunacekBiRastrigin" 
     # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
     # "hpt_breast_SVM"
@@ -78,7 +78,7 @@ problems=(
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
     # "hpt_diabetes_AdaBoost"
-    "hpt_diabetes_MLPSGD"
+    # "hpt_diabetes_MLPSGD"
 )
 
 # Function to run problems in batches
