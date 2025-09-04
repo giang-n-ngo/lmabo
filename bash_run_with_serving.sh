@@ -19,4 +19,4 @@ echo "About to export: server_node='$SERVER_NODE', method='$method'"
 
 # Submit a single job to run all problems in parallel
 echo "Submitting single parallel job for all problems"
-sbatch --job-name=$method --export=server_node="$SERVER_NODE",method="$method" slurm_run.sh
+sbatch --job-name=$method --export=server_node="$SERVER_NODE",method="$method" slurm_run_m.sh
