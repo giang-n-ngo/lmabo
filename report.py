@@ -159,6 +159,147 @@ def rank_methods_by_problem(rel_performance_df, problem):
     # print full df without new line
     print(ranked_df.to_string(index=False))
 
+methods_order = [
+    "PosSTD",
+    "PosMean",
+    "PI", 
+    "LogPI",
+    "EI",
+    "LogEI",
+    "UCB",
+    "TS",
+    "KG",
+    "PES",
+    "MES",
+    "JES",
+    "LLAMBO",
+    "LLMP",
+    "GP-Hedge",
+    "No-Past-BO",
+    "Setup-BO",
+    "ESP",
+    "LMABO",
+]
+
+method_name_mapping = {
+    "PosSTD": "PosSTD",
+    "PosMean": "PosMean",
+    "PI": "PI", 
+    "LogPI": "LogPI",
+    "EI": "EI",
+    "LogEI": "LogEI",
+    "UCB": "UCB",
+    "TS": "TS",
+    "qKG": "KG",
+    "qPES": "PES",
+    "qMES": "MES",
+    "qJES": "JES",
+    "llambo": "LLAMBO",
+    "llmgp": "LLMP",
+    "gphedge": "GP-Hedge",
+    "no_past_bo": "No-Past-BO",
+    "setup_bo": "Setup-BO",
+    "esp": "ESP",
+    "lmabo": "LMABO",
+}
+
+def get_median_iqr_summary(rel_performance_df):
+    # rel_performance_df: columns: method, problem, relative_performance, problem_rank
+    # For each method, compute the median and IQR (Q1 and Q3) of relative_performance across problems
+    # Also for each method, compute the mean, min, and max rank across problems
+    # Along with the number of times a method is the best (rank 1) across problems
+    # Return a summary dataframe 
+    gp = rel_performance_df.groupby("method")
+    median = gp["relative_performance"].median()
+    q1 = gp["relative_performance"].quantile(0.25)
+    q3 = gp["relative_performance"].quantile(0.75)
+    mean_rank = gp["problem_rank"].mean()
+    min_rank = gp["problem_rank"].min()
+    max_rank = gp["problem_rank"].max()
+    best_count = rel_performance_df[rel_performance_df["problem_rank"] == 1].groupby("method").size()
+    n = gp.size()
+
+    summary_df = pd.DataFrame({
+        "method": median.index,
+        "median": median.values,
+        "Q1": q1.values,
+        "Q3": q3.values,
+        "mean_rank": mean_rank.values,
+        "min_rank": min_rank.values,
+        "max_rank": max_rank.values,
+        "best_count": best_count.reindex(median.index).fillna(0).astype(int).values,
+        "n": n.values,
+    }).set_index("method")
+
+    # Map internal method keys to display names using method_name_mapping.
+    # If a method key is not in the mapping, keep it as-is.
+    summary_df.index = [method_name_mapping.get(m, m) for m in summary_df.index]
+
+    return summary_df
+
+
+def summary_to_latex(summary_df, filename="summary.tex", methods_order=None, method_name_mapping=None):
+    """
+    Write a LaTeX table where each row corresponds to a method in methods_order.
+    summary_df is indexed by method (either internal keys or display names) and must have columns:
+      median, Q1, Q3, mean_rank, min_rank, max_rank, best_count, n
+
+    - methods_order: list of internal method keys in the desired order.
+    - method_name_mapping: dict mapping internal method keys -> display names.
+    """
+    if methods_order is None:
+        methods_order = list(summary_df.index)
+    if method_name_mapping is None:
+        method_name_mapping = {}
+
+    header = r"""\begin{table}[t]
+\caption{Performance comparison across all benchmark problems. LMABO demonstrates superior performance with the best median relative performance and mean rank. Bold values indicate the best performance in each metric.}
+\label{tab:aggregated}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lccr@{}}
+\toprule
+\multirow{2}{*}{\textbf{Method}} & \multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}\textbf{Median relative performance} \\ \textbf{(Interquartile Range)}\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}\textbf{Mean rank} \\ \textbf{(Min--Max)}\end{tabular}} & \multirow{2}{*}{\begin{tabular}[c]{@{}c@{}}\textbf{\#1st} \\ \textbf{ranks}\end{tabular}} \\
+& & & \\
+\midrule
+\multicolumn{4}{l}{\textit{Static Acquisition Functions}} \\
+\midrule
+"""
+    footer = r"""\hline
+\bottomrule
+\end{tabular}
+\end{table}
+"""
+    rows = []
+    for m in methods_order:
+        display = method_name_mapping.get(m, m)
+        # Try to find the row by internal key first, otherwise by display name
+        if m in summary_df.index:
+            row = summary_df.loc[m]
+        elif display in summary_df.index:
+            row = summary_df.loc[display]
+        else:
+            rows.append(f"{display} & -- & -- & 0 \\\\")
+            continue
+
+        med = row["median"]
+        q1 = row["Q1"]
+        q3 = row["Q3"]
+        mean_r = row["mean_rank"]
+        min_r = int(row["min_rank"])
+        max_r = int(row["max_rank"])
+        best = int(row["best_count"])
+
+        # Remove 'n' from the performance string per request
+        perf_str = f"{med:.3f} ({q1:.3f}--{q3:.3f})"
+        rank_str = f"{mean_r:.2f} ({min_r} - {max_r})"
+        rows.append(f"{display} & {perf_str} & {rank_str} & {best} \\\\")
+
+    table = header + "\n".join(rows) + "\n" + footer
+    with open(filename, "w") as f:
+        f.write(table)
+    print(f"Wrote LaTeX summary to {filename}")
+
 if __name__=="__main__":
     sys.stdout = open(f"report_bo.txt", 'w')
 
@@ -196,12 +337,19 @@ if __name__=="__main__":
     all_simple_regrets = cal_simple_regret(all_raw_results, empirical_optimum)
     agg_simple_regrets_df = aggregate_and_to_df(all_simple_regrets, "auc")
     rel_performance_df = get_relative_performance_and_rank(agg_simple_regrets_df, completed_problems)
-    summary_df = summary_by_method(rel_performance_df)
-    print(summary_df.to_string(index=False))
-    print("="*200)
-    for problem in completed_problems:
-        rank_methods_by_problem(rel_performance_df, problem)
-        print("="*200)
+    # summary_df = summary_by_method(rel_performance_df)
+    # print(summary_df.to_string(index=False))
+    # print("="*200)
+    # for problem in completed_problems:
+    #     rank_methods_by_problem(rel_performance_df, problem)
+    #     print("="*200)
+    summary_df = get_median_iqr_summary(rel_performance_df)
+    summary_to_latex(
+        summary_df, 
+        filename="summary.tex", 
+        methods_order=methods_order, 
+        method_name_mapping=method_name_mapping
+    )
 
     # Don't forget to close the file
     sys.stdout.close()
