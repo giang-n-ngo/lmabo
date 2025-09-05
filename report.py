@@ -393,14 +393,14 @@ if __name__=="__main__":
         # "no_past_bo",
         # "setup_bo",
         # "esp",
-        "lmabo-ops", # ablation method
+        # "lmabo-ops", # ablation method
+        # "lmabo-ab1", # ablation method
+        # "lmabo-ab2", # ablation method
+        # "lmabo-ab3", # ablation method
         "bo_alternating_k1", # ablation method
         "bo_alternating_k3", # ablation method
         "bo_alternating_k5", # ablation method
         "bo_explore_exploit", # ablation method
-        "lmabo-ab1", # ablation method
-        "lmabo-ab2", # ablation method
-        "lmabo-ab3", # ablation method
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
