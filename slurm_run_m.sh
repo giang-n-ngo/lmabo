@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-large
 #SBATCH --gpus=1
-#SBATCH --time=12:00:00 
-#SBATCH --mem=40GB                    
-#SBATCH --cpus-per-gpu=12             
+#SBATCH --time=3:00:00 
+#SBATCH --mem=10GB                    
+#SBATCH --cpus-per-gpu=16             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -62,21 +62,21 @@ problems=(
     # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
     # "hpt_breast_SVM"
-    "hpt_breast_AdaBoost"
-    "hpt_breast_MLPSGD"
-    "hpt_digits_RandomForest"
-    "hpt_digits_DecisionTree"
-    "hpt_digits_SVM"
-    "hpt_digits_AdaBoost"
-    "hpt_digits_MLPSGD"
-    "hpt_wine_RandomForest"
-    "hpt_wine_DecisionTree"
-    "hpt_wine_SVM"
-    "hpt_wine_AdaBoost"
-    "hpt_wine_MLPSGD"
-    "hpt_diabetes_RandomForest"
-    "hpt_diabetes_DecisionTree"
-    "hpt_diabetes_SVM"
+    # "hpt_breast_AdaBoost"
+    # "hpt_breast_MLPSGD"
+    # "hpt_digits_RandomForest"
+    # "hpt_digits_DecisionTree"
+    # "hpt_digits_SVM"
+    # "hpt_digits_AdaBoost"
+    # "hpt_digits_MLPSGD"
+    # "hpt_wine_RandomForest"
+    # "hpt_wine_DecisionTree"
+    # "hpt_wine_SVM"
+    # "hpt_wine_AdaBoost"
+    # "hpt_wine_MLPSGD"
+    # "hpt_diabetes_RandomForest"
+    # "hpt_diabetes_DecisionTree"
+    # "hpt_diabetes_SVM"
     "hpt_diabetes_AdaBoost"
     "hpt_diabetes_MLPSGD"
 )
