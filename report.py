@@ -295,7 +295,6 @@ def summary_to_latex(summary_df, filename="summary.tex", methods_order=None, met
         f.write(table)
     print(f"Wrote LaTeX summary to {filename}")
 
-
 def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, methods_order=None, control_method="lmabo"):
     """
     Perform Friedman omnibus and pairwise Wilcoxon tests on:
@@ -419,12 +418,12 @@ if __name__=="__main__":
     all_simple_regrets = cal_simple_regret(all_raw_results, empirical_optimum)
     agg_simple_regrets_df = aggregate_and_to_df(all_simple_regrets, "auc")
     rel_performance_df = get_relative_performance_and_rank(agg_simple_regrets_df, completed_problems)
-    # summary_df = summary_by_method(rel_performance_df)
-    # print(summary_df.to_string(index=False))
-    # print("="*200)
-    # for problem in completed_problems:
-    #     rank_methods_by_problem(rel_performance_df, problem)
-    #     print("="*200)
+    temp_summary_df = summary_by_method(rel_performance_df)
+    print(temp_summary_df.to_string(index=False))
+    print("="*200)
+    for problem in completed_problems:
+        rank_methods_by_problem(rel_performance_df, problem)
+        print("="*200)
     summary_df = get_median_iqr_summary(rel_performance_df, method_name_mapping)
 
     # Run statistical tests on relative performance and ranks using rel_performance_df.

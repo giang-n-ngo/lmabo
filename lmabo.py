@@ -58,7 +58,7 @@ INFORMATION_SUMMARY_LIST = [
     - **Shortest distance**: The shortest distance from the last point to any other point, indicating whether it is exploiting too much.
 
     """,
-    # Ablation 3: No shortes distance
+    # Ablation 3: No shortest distance
     """
     I will provide you with a summary of the Bayesian Optimization process at each step. This summary will include the following information:
     - **N:** The total number of points evaluated so far.

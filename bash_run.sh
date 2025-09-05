@@ -7,9 +7,9 @@ methods=(
     # "lmabo-ab3"
     # "bo" 
     # "gphedge"
-    # "esp"
+    "esp"
     # "no_past_bo"
-    "setup_bo"
+    # "setup_bo"
     # "bo_alternating_k1"
     # "bo_alternating_k3"
     # "bo_alternating_k5"
@@ -19,5 +19,5 @@ methods=(
 # Loop over each problem and algorithm
 for method in "${methods[@]}"; do
     echo "Submitting job: ${method}"
-    sbatch --job-name="${method}_3" --export=method=$method slurm_run.sh
+    sbatch --job-name="${method}" --export=method=$method slurm_run.sh
 done
