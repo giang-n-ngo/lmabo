@@ -6,7 +6,7 @@
 #SBATCH --gpus=1
 #SBATCH --time=24:00:00 
 #SBATCH --mem-per-cpu=4G                    
-#SBATCH --cpus-per-gpu=18             
+#SBATCH --cpus-per-gpu=16             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -46,7 +46,7 @@ problems=(
     # "StepEllipsoid" 
     # "RosenbrockRotated" 
     # "Ellipsoid2" 
-    "Discus" 
+    # "Discus" 
     # "BentCigar" 
     # "SharpRidge" 
     # "DifferentPowers" 
