@@ -18,6 +18,62 @@ from constants import (
     EXP_RUNS,
 )
 
+final_methods = [
+    # botorch
+    "Ackley", # must have
+    "Beale",
+    # "Bukin",
+    "Cosine8", # must have
+    # "DixonPrice",
+    "DropWave",
+    "EggHolder",
+    "Griewank",
+    # "Hartmann",
+    "HolderTable",
+    "Levy",
+    "Michalewicz",
+    # "StyblinskiTang",
+    # "Shekel",
+    "SixHumpCamel",
+    # coco
+    "BucheRastrigin",
+    "LinearSlope",
+    # "AttractiveSector",
+    "StepEllipsoid",
+    "Discus",
+    "BentCigar",
+    # "SharpRidge",
+    # "DifferentPowers",
+    "Weierstrass",
+    "SchaffersIllCond",
+    # "CompositeGriewankRosenbrock",
+    "Gallagher21",
+    "Gallagher101", # must have
+    "Katsuura",
+    # "LunacekBiRastrigin",
+    # hpt
+    "hpt_breast_RandomForest",
+    "hpt_breast_DecisionTree",
+    "hpt_breast_SVM",
+    "hpt_breast_AdaBoost",
+    "hpt_breast_MLPSGD",
+    "hpt_digits_RandomForest", # must have
+    "hpt_digits_DecisionTree",
+    "hpt_digits_SVM",
+    "hpt_digits_AdaBoost",
+    "hpt_digits_MLPSGD",
+    "hpt_wine_RandomForest",
+    "hpt_wine_DecisionTree",
+    "hpt_wine_SVM",
+    "hpt_wine_AdaBoost",
+    "hpt_wine_MLPSGD",
+    "hpt_diabetes_RandomForest",
+    "hpt_diabetes_DecisionTree",
+    "hpt_diabetes_SVM",
+    "hpt_diabetes_AdaBoost",
+    "hpt_diabetes_MLPSGD",
+]
+
 def read_raw_result(problem, acq_type, result_type):
     raw_result = []
     for exp_idx in range(EXP_RUNS):
@@ -170,17 +226,25 @@ methods_order = [
     "LogEI",
     "UCB",
     "TS",
-    "KG",
-    "PES",
-    "MES",
-    "JES",
-    "LLAMBO",
-    "LLMP",
-    "GP-Hedge",
-    "No-Past-BO",
-    "Setup-BO",
-    "ESP",
-    "LMABO",
+    "qKG",
+    "qPES",
+    "qMES",
+    "qJES",
+    "llambo",
+    "llmgp",
+    "gphedge",
+    "no_past_bo",
+    "setup_bo",
+    "esp",
+    "lmabo",
+]
+
+methods_order_ablation = [
+    "lmabo-ab1",
+    "lmabo-ab2",
+    "lmabo-ab3",
+    "lmabo-ops",
+    "lmabo",
 ]
 
 method_name_mapping = {
@@ -203,15 +267,17 @@ method_name_mapping = {
     "setup_bo": "Setup-BO",
     "esp": "ESP",
     "lmabo": "LMABO",
+    "lmabo-ab1": "LMABO-AB1",
+    "lmabo-ab2": "LMABO-AB2",
+    "lmabo-ab3": "LMABO-AB3",
+    "lmabo-ops": "LMABO-OPS",
 }
 
-def get_median_iqr_summary(rel_performance_df, method_name_mapping=None):
+def get_mean_iqr_summary(rel_performance_df):
     # rel_performance_df: columns: method, problem, relative_performance, problem_rank
-    if method_name_mapping is None:
-        method_name_mapping = {}
 
     gp = rel_performance_df.groupby("method")
-    median = gp["relative_performance"].median()
+    mean = gp["relative_performance"].mean()
     q1 = gp["relative_performance"].quantile(0.25)
     q3 = gp["relative_performance"].quantile(0.75)
     mean_rank = gp["problem_rank"].mean()
@@ -221,66 +287,64 @@ def get_median_iqr_summary(rel_performance_df, method_name_mapping=None):
     n = gp.size()
 
     summary_df = pd.DataFrame({
-        "method": median.index,
-        "median": median.values,
+        "method": mean.index,
+        "mean": mean.values,
         "Q1": q1.values,
         "Q3": q3.values,
         "mean_rank": mean_rank.values,
         "min_rank": min_rank.values,
         "max_rank": max_rank.values,
-        "best_count": best_count.reindex(median.index).fillna(0).astype(int).values,
+        "best_count": best_count.reindex(mean.index).fillna(0).astype(int).values,
         "n": n.values,
     }).set_index("method")
 
-    # Add a display_name column using the provided mapping (keep internal keys as index)
-    summary_df["display_name"] = [method_name_mapping.get(m, m) for m in summary_df.index]
-
     return summary_df
 
-def summary_to_latex(summary_df, filename="summary.tex", methods_order=None, method_name_mapping=None, pairwise_p_rel=None, pairwise_p_rank=None):
-    if method_name_mapping is None:
-        method_name_mapping = {}
-
-    # Ensure methods_order is a list of internal method keys in desired order
-    if methods_order is None:
-        methods_order = list(summary_df.index)
-    else:
-        # keep order but only include those present; append missing methods present in summary_df
-        ordered = [m for m in methods_order if m in summary_df.index]
-        ordered += [m for m in summary_df.index if m not in ordered]
-        methods_order = ordered
-
+def summary_to_latex(summary_df, filename="summary.tex", pairwise_p_rel=None, pairwise_p_rank=None):
     # header/footer unchanged
-    header = r"""\begin{table}[t]
-\caption{Performance comparison across all benchmark problems. Bold values indicate the best performance in each metric.}
-\label{tab:aggregated}
-\centering
-\renewcommand{\arraystretch}{1.2}
-\begin{tabular}{@{}lccrr@{}}
-\toprule
-\textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Median relative} \\ \textbf{performance (IQR)}\end{tabular} & \textbf{Mean rank (Min--Max)} & \textbf{p (rel, Holm)} & \textbf{p (rank, Holm)} \\
-\midrule
-"""
+    header = r"""
+    \begin{table}
+    \caption{
+        \textbf{Overall performance comparison of LMABO against all baselines across 60 optimization problems}. 
+        For each problem, we compute the total Area Under the Regret Curve (AUC) for each method by summing the AUCs from its 10 independent runs. 
+        The \textbf{Relative Performance (RP)} is calculated by normalizing each method's total AUC against the best-performing method for that problem (which receives an RP of 1.0); 
+        we report the mean and interquartile range of these RPs across all 60 problems. 
+        The \textbf{Mean Rank} is computed by ranking methods on each problem from 1 (best) to 19 (worst) based on their total AUC and then averaging these ranks across all problems. 
+        Friedman tests confirm a statistically significant difference between methods for both RP and rank.
+        The p-values in the last two columns are derived from a one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction comparing the distribution of RPs (or ranks) for each baseline against LMABO. 
+        A low p-value indicates a statistically significant outperformance by LMABO. 
+        Results in bold highlight the best performance for each metric.
+        It should be noted that both RP and rank include ablation methods (which is why the maximum rank is 23 instead of 19).
+        Separate results for the ablation methods are provided in Table \ref{tab:ablation}.
+    }
+    \label{tab:aggregated}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}lccrr@{}}
+    \toprule
+    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular}\\
+    \multicolumn{4}{l}{\textit{Static Acquisition Functions}} \\
+    """
     footer = r"""\bottomrule
-\end{tabular}
-\end{table}
-"""
+    \end{tabular}
+    \end{table}
+    """
     rows = []
     for m in methods_order:
-        display = method_name_mapping.get(m, summary_df.loc[m]["display_name"] if m in summary_df.index else m)
+        display = method_name_mapping[m]
         if m not in summary_df.index:
             rows.append(f"{display} & -- & -- & -- & -- \\\\")
             continue
 
         row = summary_df.loc[m]
-        med = row["median"]
+        mean = row["mean"]
         q1 = row["Q1"]
         q3 = row["Q3"]
         mean_r = row["mean_rank"]
         min_r = int(row["min_rank"])
         max_r = int(row["max_rank"])
 
-        perf_str = f"{med:.3f} ({q1:.3f}--{q3:.3f})"
+        perf_str = f"{mean:.3f} ({q1:.3f}--{q3:.3f})"
         rank_str = f"{mean_r:.2f} ({min_r}--{max_r})"
 
         p_rel = (pairwise_p_rel.get(m) if pairwise_p_rel is not None else None)
@@ -289,13 +353,74 @@ def summary_to_latex(summary_df, filename="summary.tex", methods_order=None, met
         p_rank_str = f"{p_rank:.3e}" if p_rank is not None else "--"
 
         rows.append(f"{display} & {perf_str} & {rank_str} & {p_rel_str} & {p_rank_str} \\\\")
+        if m == "qJES":
+            rows.append(r"\multicolumn{4}{l}{\textit{LLM-based Methods}} \\")
+        elif m == "llmgp":
+            rows.append(r"\multicolumn{4}{l}{\textit{Adaptive Portfolio Methods}} \\")
+        elif m == "esp":
+            rows.append(r"\midrule")
 
     table = header + "\n".join(rows) + "\n" + footer
     with open(filename, "w") as f:
         f.write(table)
     print(f"Wrote LaTeX summary to {filename}")
 
-def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, methods_order=None, control_method="lmabo"):
+def ablation_summary_to_latex(summary_df, filename):
+    # header/footer unchanged
+    header = r"""
+    \begin{table}
+    \caption{
+        \textbf{Ablation study on the components of LMABO}. 
+        We analyze the contribution of LMABO's key components by comparing the full model to four ablated versions: LMABO-AB1, LMABO-AB2, and LMABO-AB3, which remove the remaining budget, GP model characteristics, and shortest distance information, respectively; and LMABO-OPS, which uses a smaller language model (Qwen3-8B). 
+        The Mean RP and Mean Rank are calculated using the same global ranking of all baseline and ablation methods as in Table \ref{tab:aggregated}. 
+        The p-values from a one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction compare each ablated model against the full LMABO.
+    }
+    \label{tab:ablation}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}lccrr@{}}
+    \toprule
+    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular}\\
+    \multicolumn{4}{l}{\textit{Ablation Methods}} \\
+    """
+    footer = r"""
+    \bottomrule
+    \end{tabular}
+    \end{table}
+    """
+    rows = []
+    for m in methods_order_ablation:
+        display = method_name_mapping[m]
+        if m not in summary_df.index:
+            rows.append(f"{display} & -- & -- & -- & -- \\\\")
+            continue
+
+        row = summary_df.loc[m]
+        mean = row["mean"]
+        q1 = row["Q1"]
+        q3 = row["Q3"]
+        mean_r = row["mean_rank"]
+        min_r = int(row["min_rank"])
+        max_r = int(row["max_rank"])
+
+        perf_str = f"{mean:.3f} ({q1:.3f}--{q3:.3f})"
+        rank_str = f"{mean_r:.2f} ({min_r}--{max_r})"
+
+        p_rel = None
+        p_rank = None
+        p_rel_str = f"{p_rel:.3e}" if p_rel is not None else "--"
+        p_rank_str = f"{p_rank:.3e}" if p_rank is not None else "--"
+
+        rows.append(f"{display} & {perf_str} & {rank_str} & {p_rel_str} & {p_rank_str} \\\\")
+        if m == "lmabo-ops":
+            rows.append(r"\midrule")
+
+    table = header + "\n".join(rows) + "\n" + footer
+    with open(filename, "w") as f:
+        f.write(table)
+    print(f"Wrote LaTeX ablation summary to {filename}")
+
+def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, control_method="lmabo"):
     """
     Perform Friedman omnibus and pairwise Wilcoxon tests on:
       - relative_performance (numeric)
@@ -315,11 +440,8 @@ def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, meth
     pivot_rank = pivot_rank.loc[pivot_rel.index]  # align
 
     available_methods = list(pivot_rel.columns)
-    if methods_order is None:
-        methods = available_methods
-    else:
-        methods = [m for m in methods_order if m in available_methods]
-        methods += [m for m in available_methods if m not in methods]
+    methods = [m for m in methods_order if m in available_methods]
+    methods += [m for m in available_methods if m not in methods]
 
     pivot_rel = pivot_rel[methods]
     pivot_rank = pivot_rank[methods]
@@ -386,7 +508,8 @@ if __name__=="__main__":
 
     all_methods = list(ACQ_TYPE_MAPPING.keys())
     all_methods.extend(list(ALGO_FILE_COUNT.keys()))
-    all_problems = OBJECTIVE_FUNCTIONS_NAMES
+    # all_problems = OBJECTIVE_FUNCTIONS_NAMES
+    all_problems = final_methods
     # exclude some methods during the main report
     excluded_methods = [
         # "no_past_bo",
@@ -405,7 +528,7 @@ if __name__=="__main__":
 
     # Redirect output to file
     problems = []
-    for item in OBJECTIVE_FUNCTIONS_NAMES:
+    for item in all_problems:
         problems.append(item)
 
     completed_problems = report_completion(problems, all_methods, excluded_methods)
@@ -424,7 +547,7 @@ if __name__=="__main__":
     for problem in completed_problems:
         rank_methods_by_problem(rel_performance_df, problem)
         print("="*200)
-    summary_df = get_median_iqr_summary(rel_performance_df, method_name_mapping)
+    summary_df = get_mean_iqr_summary(rel_performance_df)
 
     # Run statistical tests on relative performance and ranks using rel_performance_df.
     completed_for_stats = list_completed_problems(agg_simple_regrets_df)
@@ -438,7 +561,6 @@ if __name__=="__main__":
         stats_res = run_stats_on_rel_perf_and_ranks(
             rel_performance_df,
             completed_problems=completed_for_stats,
-            methods_order=methods_order,
             control_method="lmabo",
         )
 
@@ -460,10 +582,12 @@ if __name__=="__main__":
         summary_to_latex(
             summary_df,
             filename="summary.tex",
-            methods_order=methods_order,
-            method_name_mapping=method_name_mapping,
             pairwise_p_rel=pairwise_p_rel,
             pairwise_p_rank=pairwise_p_rank,
+        )
+        ablation_summary_to_latex(
+            summary_df,
+            filename="summary_ablation.tex",
         )
 
         # # optional: save pairwise table for inspection

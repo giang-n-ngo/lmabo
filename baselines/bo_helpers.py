@@ -145,8 +145,8 @@ def _optimize_acqf(acq_type, acq_func, bounds, cheap=False):
             "acq_function": acq_func,
             "bounds": bounds,
             "q": 1,
-            "num_restarts": 10 if not cheap else 2,
-            "raw_samples": 512 if not cheap else 64
+            "num_restarts": 10 if not cheap else 1,
+            "raw_samples": 512 if not cheap else 16
         }
         candidate, _ = optimize_acqf(**optimize_acqf_kwargs)
     return candidate

@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=24:00:00 
-#SBATCH --mem-per-cpu=4G                    
-#SBATCH --cpus-per-gpu=16             
+#SBATCH --time=4:00:00 
+#SBATCH --mem=24G                    
+#SBATCH --cpus-per-gpu=24             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -20,7 +20,7 @@ CUDA_LAUNCH_BLOCKING=1
 
 problems=(
     # "Ackley" 
-    "Beale" 
+    # "Beale" 
     # "Branin" 
     # "Bukin" 
     # "Cosine8" 
@@ -34,27 +34,27 @@ problems=(
     # "Michalewicz" 
     # "Powell" 
     # "Rastrigin" 
-    # "Rosenbrock" 
+    "Rosenbrock" 
     # "Shekel" 
     # "SixHumpCamel" 
     # "StyblinskiTang" 
     # "Easom" 
-    # "Sphere" 
+    "Sphere" 
     # "BucheRastrigin" 
     # "LinearSlope" 
     # "AttractiveSector" 
     # "StepEllipsoid" 
     # "RosenbrockRotated" 
     # "Ellipsoid2" 
-    "Discus" 
+    # "Discus" 
     # "BentCigar" 
     # "SharpRidge" 
-    # "DifferentPowers" 
+    "DifferentPowers" 
     # "Weierstrass" 
     # "Schaffers" 
     # "SchaffersIllCond" 
-    # "CompositeGriewankRosenbrock" 
-    # "Schwefel" 
+    "CompositeGriewankRosenbrock" 
+    "Schwefel" 
     # "Gallagher21" 
     # "Gallagher101" 
     # "Katsuura" 
@@ -102,7 +102,7 @@ run_batch() {
 
 # Split into batches of 12 problems for 60 problems
 echo "Running problems in batches of 12..."
-run_batch "${problems[@]:0:3}"    # Problems 0-11
+run_batch "${problems[@]:0:12}"    # Problems 0-11
 # run_batch "${problems[@]:12:12}"   # Problems 12-23
 # run_batch "${problems[@]:24:12}"   # Problems 24-35
 # run_batch "${problems[@]:36:12}"   # Problems 36-47
