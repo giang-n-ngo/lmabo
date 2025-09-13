@@ -82,7 +82,7 @@ def _prepare_acquisition_function(acq_type, bounds, best_f, gp):
         acq_func = LogExpectedImprovement(model=gp, best_f=best_f, maximize=False)
     elif acq_type == "UCB":
         N = gp.train_inputs[0].shape[0]
-        acq_func = UpperConfidenceBound(model=gp, beta=10*math.log(N), maximize=False)
+        acq_func = UpperConfidenceBound(model=gp, beta=4*math.log(N), maximize=False)
     elif acq_type == "PosMean":
         acq_func = PosteriorMean(model=gp, maximize=False)
     elif acq_type == "PosSTD":

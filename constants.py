@@ -98,6 +98,7 @@ ALGO_FILE_COUNT = {
     "lmabo-ab1": 6,
     "lmabo-ab2": 6,
     "lmabo-ab3": 6,
+    "lmabo-ab4": 6,
     "gphedge": 6,
     "no_past_bo": 6,
     "setup_bo": 6,

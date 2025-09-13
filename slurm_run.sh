@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=4:00:00 
-#SBATCH --mem=24G                    
-#SBATCH --cpus-per-gpu=24             
+#SBATCH --time=12:00:00 
+#SBATCH --mem=10G                    
+#SBATCH --cpus-per-gpu=8             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -19,42 +19,32 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    # "Ackley" 
-    # "Beale" 
-    # "Branin" 
-    # "Bukin" 
-    # "Cosine8" 
-    # "DixonPrice" 
-    # "DropWave" 
-    # "EggHolder" 
-    # "Griewank" 
-    # "Hartmann" 
-    # "HolderTable" 
-    # "Levy" 
-    # "Michalewicz" 
-    # "Powell" 
-    # "Rastrigin" 
-    "Rosenbrock" 
-    # "Shekel" 
-    # "SixHumpCamel" 
-    # "StyblinskiTang" 
-    # "Easom" 
-    "Sphere" 
+    "Ackley" 
+    "Beale" 
+    "Bukin" 
+    "Cosine8" 
+    "DixonPrice" 
+    "DropWave" 
+    "EggHolder" 
+    "Griewank" 
+    "Hartmann" 
+    "HolderTable" 
+    "Levy" 
+    "Michalewicz" 
+    "Shekel" 
+    "SixHumpCamel" 
+    "StyblinskiTang" 
     # "BucheRastrigin" 
     # "LinearSlope" 
     # "AttractiveSector" 
     # "StepEllipsoid" 
-    # "RosenbrockRotated" 
-    # "Ellipsoid2" 
     # "Discus" 
     # "BentCigar" 
     # "SharpRidge" 
-    "DifferentPowers" 
+    # "DifferentPowers" 
     # "Weierstrass" 
-    # "Schaffers" 
     # "SchaffersIllCond" 
-    "CompositeGriewankRosenbrock" 
-    "Schwefel" 
+    # "CompositeGriewankRosenbrock" 
     # "Gallagher21" 
     # "Gallagher101" 
     # "Katsuura" 
@@ -100,12 +90,17 @@ run_batch() {
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 12 problems for 60 problems
-echo "Running problems in batches of 12..."
-run_batch "${problems[@]:0:12}"    # Problems 0-11
-# run_batch "${problems[@]:12:12}"   # Problems 12-23
-# run_batch "${problems[@]:24:12}"   # Problems 24-35
-# run_batch "${problems[@]:36:12}"   # Problems 36-47
-# run_batch "${problems[@]:48:12}"   # Problems 48-59
+# Split into batches of 2 problems for 20 problems
+echo "Running problems in batches of 2..."
+run_batch "${problems[@]:0:2}"    # Problems 0-1
+run_batch "${problems[@]:2:2}"    # Problems 2-3
+run_batch "${problems[@]:4:2}"    # Problems 4-5
+run_batch "${problems[@]:6:2}"    # Problems 6-7
+run_batch "${problems[@]:8:2}"    # Problems 8-9
+run_batch "${problems[@]:10:2}"   # Problems 10-11
+run_batch "${problems[@]:12:2}"   # Problems 12-13
+run_batch "${problems[@]:14:2}"   # Problems 14-15
+run_batch "${problems[@]:15:3}"  # Problems 15-17
+run_batch "${problems[@]:18:2}"  # Problems 18-19
 
 echo "All problems completed!"

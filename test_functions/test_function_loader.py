@@ -28,15 +28,15 @@ COCO_DICT = {
 
 DIMS = {
     "Ackley": 50,
+    "DixonPrice": 15,
+    "Griewank": 9,
+    "Hartmann": 6,
+    "Levy": 13,
+    "Michalewicz": 10,
+    "Powell": 18,
     "Rosenbrock": 24,
     "Rastrigin": 23,
     "StyblinskiTang": 21,
-    "Powell": 18,
-    "DixonPrice": 15,
-    "Levy": 13,
-    "Michalewicz": 10,
-    "Griewank": 9,
-    "Hartmann": 6,
 }
 
 def load_objective_func(problem, problem_type="botorch"):

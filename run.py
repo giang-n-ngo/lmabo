@@ -172,12 +172,25 @@ def run_problem(
             objective_func
         )
         acq_type_list, choice_list, messages, weights = None, None, None, None
-        if acq_type in ["lmabo", "lmabo-ops", "lmabo-ab1", "lmabo-ab2", "lmabo-ab3"]:
+        if acq_type in [
+            "lmabo", 
+            "lmabo-ops", 
+            "lmabo-ab1", 
+            "lmabo-ab2", 
+            "lmabo-ab3",
+            "lmabo-ab4"
+        ]:
             from lmabo import (
                 LanguageModelAssistedAdaptiveBO, 
                 LanguageModelAssistedAdaptiveBOAblation
             )
-            if acq_type in ["lmabo", "lmabo-ab1", "lmabo-ab2", "lmabo-ab3"]:
+            if acq_type in [
+                "lmabo", 
+                "lmabo-ab1", 
+                "lmabo-ab2", 
+                "lmabo-ab3", 
+                "lmabo-ab4"
+            ]:
                 llm = "api"
             elif acq_type == "lmabo-ops":
                 llm = "ops"
@@ -192,7 +205,12 @@ def run_problem(
                     llm,
                     server_node,
                 )
-            elif acq_type in ["lmabo-ab1", "lmabo-ab2", "lmabo-ab3"]:
+            elif acq_type in [
+                "lmabo-ab1", 
+                "lmabo-ab2", 
+                "lmabo-ab3",
+                "lmabo-ab4"
+            ]:
                 ablation_id = int(acq_type[-1])
                 LMABO = LanguageModelAssistedAdaptiveBOAblation(
                     objective_func, 
@@ -207,24 +225,24 @@ def run_problem(
             # optimize and get results
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
             del LMABO  # Free memory
-        elif acq_type in ["lmabo2", "lmabo2-ops"]:
-            from lmabo import LanguageModelAssistedAdaptiveBO2
-            if acq_type == "lmabo2":
-                llm = "api"
-            elif acq_type == "lmabo2-ops":
-                llm = "ops"
-            LMABO2 = LanguageModelAssistedAdaptiveBO2(                
-                objective_func, 
-                fixed_train_X, 
-                fixed_train_Y, 
-                bounds, 
-                num_iterations,
-                llm,
-                server_node,
-            )
-            # optimize and get results
-            simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
-            del LMABO2  # Free memory
+        # elif acq_type in ["lmabo2", "lmabo2-ops"]:
+        #     from lmabo import LanguageModelAssistedAdaptiveBO2
+        #     if acq_type == "lmabo2":
+        #         llm = "api"
+        #     elif acq_type == "lmabo2-ops":
+        #         llm = "ops"
+        #     LMABO2 = LanguageModelAssistedAdaptiveBO2(                
+        #         objective_func, 
+        #         fixed_train_X, 
+        #         fixed_train_Y, 
+        #         bounds, 
+        #         num_iterations,
+        #         llm,
+        #         server_node,
+        #     )
+        #     # optimize and get results
+        #     simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
+        #     del LMABO2  # Free memory
         elif acq_type == "gphedge":
             from baselines.gp_hedge import gp_hedge_full_loop
             # run GP-Hedge
@@ -330,8 +348,9 @@ def parse_arguments():
                            "lmabo-ab1",
                            "lmabo-ab2",
                            "lmabo-ab3",
-                           "lmabo2",
-                           "lmabo2-ops",
+                           "lmabo-ab4",
+                        #    "lmabo2",
+                        #    "lmabo2-ops",
                            "gphedge", 
                            "no_past_bo",
                            "setup_bo",

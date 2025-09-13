@@ -3,6 +3,7 @@ import re
 import time
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
+from google.generativeai.types import generation_types
 
 from key import API_KEYS
 
@@ -310,6 +311,8 @@ class ConversationHolder:
         self.llm = llm
         self.full_choice_list = full_choice_list
         self.messages = []
+        self.token_count = 0  # Initialize token count
+        self.money_cost = 0.0  # Initialize money cost
         if self.llm == "api":
             self.chat, initial_response = configure_and_start_chat_api(first_prompt)
             self.messages.append(initial_response)
@@ -353,10 +356,21 @@ class ConversationHolder:
         while retries < self.api_max_entries:
             try:
                 # Send the updated summary to the active chat
-                response = self.chat.send_message(prompt)
+                response = self.chat.send_message(
+                    prompt,
+                    generation_config=generation_types.GenerationConfig(
+                        temperature=0.0,
+                    )
+                )
 
                 if response.text:
                     llm_suggested_af = self._api_process_suggestion_response(response.text)
+                    # Update token count and cost (replace with actual logic)
+                    input_tokens = len(prompt.split())  # Rough estimate
+                    output_tokens = len(response.text.split())  # Rough estimate
+                    self.token_count += input_tokens + output_tokens
+                    # Replace with actual pricing
+                    self.money_cost += (input_tokens * 0.3/1e6) + (output_tokens * 2.5/1e6) 
                     break # Success, exit retry loop
 
                 else:
@@ -443,85 +457,87 @@ class ConversationHolder:
 
     def suggest_acq_type(self, prompt):
         if self.llm == "api":
+            print("Total tokens used so far: ", self.token_count)
+            print(f"Estimated cost so far: ${self.money_cost:.6f}")
             return self._api_suggest_acq_type(prompt)
         elif self.llm == "ops":
             return self._ops_suggest_acq_type(prompt)
         
-    def _api_suggest_choice(self, prompt):
-        retries = 0
-        current_delay = self.api_initial_delay_seconds
+    # def _api_suggest_choice(self, prompt):
+    #     retries = 0
+    #     current_delay = self.api_initial_delay_seconds
         
-        llm_suggested_choice = self.default_choice
-        while retries < self.api_max_entries:
-            try:
-                # Send the updated summary to the active chat
-                response = self.chat.send_message(prompt)
+    #     llm_suggested_choice = self.default_choice
+    #     while retries < self.api_max_entries:
+    #         try:
+    #             # Send the updated summary to the active chat
+    #             response = self.chat.send_message(prompt)
 
-                if response.text:
-                    llm_suggested_choice = self._api_process_suggestion_response(response.text)
-                    break # Success, exit retry loop
+    #             if response.text:
+    #                 llm_suggested_choice = self._api_process_suggestion_response(response.text)
+    #                 break # Success, exit retry loop
 
-                else:
-                    print("LLM returned no text content in response.")
-                    self.messages.append("LLM returned no text content in response.")
-                    llm_suggested_choice = self.default_choice # Or handle as an error
-                    break
+    #             else:
+    #                 print("LLM returned no text content in response.")
+    #                 self.messages.append("LLM returned no text content in response.")
+    #                 llm_suggested_choice = self.default_choice # Or handle as an error
+    #                 break
 
-            except ResourceExhausted as e:
-                error_message = str(e) # Get the full string representation of the error
-                suggested_delay_seconds = current_delay # Default to current backoff delay
+    #         except ResourceExhausted as e:
+    #             error_message = str(e) # Get the full string representation of the error
+    #             suggested_delay_seconds = current_delay # Default to current backoff delay
 
-                # Use regex to find the retry_delay from the error string
-                match = re.search(r"retry_delay \{[\s\n]+seconds: (\d+)[\s\n]+\}", error_message)
-                if match:
-                    try:
-                        suggested_delay_seconds = int(match.group(1))
-                        print(f"API suggested waiting {suggested_delay_seconds} seconds (parsed from error message).")
-                    except ValueError:
-                        print("Could not parse suggested retry delay from error message. Using exponential backoff.")
-                else:
-                    print("No specific retry_delay found in error message. Using exponential backoff.")
+    #             # Use regex to find the retry_delay from the error string
+    #             match = re.search(r"retry_delay \{[\s\n]+seconds: (\d+)[\s\n]+\}", error_message)
+    #             if match:
+    #                 try:
+    #                     suggested_delay_seconds = int(match.group(1))
+    #                     print(f"API suggested waiting {suggested_delay_seconds} seconds (parsed from error message).")
+    #                 except ValueError:
+    #                     print("Could not parse suggested retry delay from error message. Using exponential backoff.")
+    #             else:
+    #                 print("No specific retry_delay found in error message. Using exponential backoff.")
 
-                print(f"Rate limit hit (Retry {retries+1}/{self.api_max_entries}).")
+    #             print(f"Rate limit hit (Retry {retries+1}/{self.api_max_entries}).")
                 
-                # Use the parsed suggested delay, or our exponential backoff
-                wait_time = suggested_delay_seconds + random.uniform(0, suggested_delay_seconds * 0.1) # Add jitter
-                wait_time = min(wait_time, self.api_max_delay_seconds) # Cap the wait time
+    #             # Use the parsed suggested delay, or our exponential backoff
+    #             wait_time = suggested_delay_seconds + random.uniform(0, suggested_delay_seconds * 0.1) # Add jitter
+    #             wait_time = min(wait_time, self.api_max_delay_seconds) # Cap the wait time
 
-                print(f"Waiting for {wait_time:.2f} seconds...")
-                time.sleep(wait_time)
+    #             print(f"Waiting for {wait_time:.2f} seconds...")
+    #             time.sleep(wait_time)
 
-                retries += 1
-                current_delay = min(current_delay * 2, self.api_max_delay_seconds) # Double delay for next retry
+    #             retries += 1
+    #             current_delay = min(current_delay * 2, self.api_max_delay_seconds) # Double delay for next retry
 
-            except Exception as e:
-                print(f"An unexpected error occurred during API call: {e}")
-                break # Exit retry loop for other errors
-        else:
-            print(f"Failed to get LLM response after {self.api_max_entries} retries.")
-            return "Intentional Incorrect Choice"
-        return llm_suggested_choice  # Return the chat object and the response text for logging
+    #         except Exception as e:
+    #             print(f"An unexpected error occurred during API call: {e}")
+    #             break # Exit retry loop for other errors
+    #     else:
+    #         print(f"Failed to get LLM response after {self.api_max_entries} retries.")
+    #         return "Intentional Incorrect Choice"
+    #     return llm_suggested_choice  # Return the chat object and the response text for logging
 
-    def _ops_suggest_choice(self, prompt):
-        llm_suggested_choice = self.default_choice
-        try:
-            response = self.chatbot.generate_response(prompt)
-            if response:
-                llm_suggested_choice = self._ops_process_suggestion_response(response.strip())
-                self.messages.append(response.strip())
-            else:
-                print("LLM returned no text content in response.")
-                llm_suggested_choice = self.default_choice # Or handle as an error
-        except Exception as e:
-            print(f"An error occurred during LLM call: {e}")
-            llm_suggested_choice = "Intentional Incorrect Choice"
-        return llm_suggested_choice
+    # def _ops_suggest_choice(self, prompt):
+    #     llm_suggested_choice = self.default_choice
+    #     try:
+    #         response = self.chatbot.generate_response(prompt)
+    #         if response:
+    #             llm_suggested_choice = self._ops_process_suggestion_response(response.strip())
+    #             self.messages.append(response.strip())
+    #         else:
+    #             print("LLM returned no text content in response.")
+    #             llm_suggested_choice = self.default_choice # Or handle as an error
+    #     except Exception as e:
+    #         print(f"An error occurred during LLM call: {e}")
+    #         llm_suggested_choice = "Intentional Incorrect Choice"
+    #     return llm_suggested_choice
 
-    def suggest_choice(self, prompt):
-        if self.llm == "api":
-            return self._api_suggest_choice(prompt)
-        elif self.llm == "ops":
-            return self._ops_suggest_choice(prompt)
+    # def suggest_choice(self, prompt):
+    #     if self.llm == "api":
+    #         return self._api_suggest_choice(prompt)
+    #     elif self.llm == "ops":
+    #         return self._ops_suggest_choice(prompt)
 
     def _api_last_guess(self, last_prompt):
         try:

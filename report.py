@@ -10,7 +10,6 @@ from utils import (
 )
 
 from constants import (
-    OBJECTIVE_FUNCTIONS_NAMES,
     ACQ_TYPE_MAPPING,
     ALGO_FILE_COUNT,
     LLMGP_NUMERICAL_RESULTS_DIR,
@@ -18,40 +17,40 @@ from constants import (
     EXP_RUNS,
 )
 
-final_methods = [
+final_problems = [
     # botorch
     "Ackley", # must have
     "Beale",
-    # "Bukin",
+    "Bukin",
     "Cosine8", # must have
-    # "DixonPrice",
+    "DixonPrice",
     "DropWave",
     "EggHolder",
     "Griewank",
-    # "Hartmann",
+    "Hartmann",
     "HolderTable",
     "Levy",
     "Michalewicz",
-    # "StyblinskiTang",
-    # "Shekel",
+    "StyblinskiTang",
+    "Shekel",
     "SixHumpCamel",
     # coco
     "BucheRastrigin",
     "LinearSlope",
-    # "AttractiveSector",
+    "AttractiveSector",
     "StepEllipsoid",
     "Discus",
     "BentCigar",
-    # "SharpRidge",
-    # "DifferentPowers",
+    "SharpRidge",
+    "DifferentPowers",
     "Weierstrass",
     "SchaffersIllCond",
-    # "CompositeGriewankRosenbrock",
+    "CompositeGriewankRosenbrock",
     "Gallagher21",
     "Gallagher101", # must have
     "Katsuura",
-    # "LunacekBiRastrigin",
-    # hpt
+    "LunacekBiRastrigin",
+    # hpSV
     "hpt_breast_RandomForest",
     "hpt_breast_DecisionTree",
     "hpt_breast_SVM",
@@ -243,6 +242,7 @@ methods_order_ablation = [
     "lmabo-ab1",
     "lmabo-ab2",
     "lmabo-ab3",
+    "lmabo-ab4",
     "lmabo-ops",
     "lmabo",
 ]
@@ -270,6 +270,7 @@ method_name_mapping = {
     "lmabo-ab1": "LMABO-AB1",
     "lmabo-ab2": "LMABO-AB2",
     "lmabo-ab3": "LMABO-AB3",
+    "lmabo-ab4": "LMABO-AB4",
     "lmabo-ops": "LMABO-OPS",
 }
 
@@ -300,30 +301,40 @@ def get_mean_iqr_summary(rel_performance_df):
 
     return summary_df
 
-def summary_to_latex(summary_df, filename="summary.tex", pairwise_p_rel=None, pairwise_p_rank=None):
+def calculate_coefficient_of_variation(agg_simple_regrets_df):
+    # Calculate the coefficient of variation (CV) for each method across all problems
+    cv_df = agg_simple_regrets_df.copy()
+    cv_df["mean"] = cv_df.iloc[:, 2:].mean(axis=1)
+    cv_df["std"] = cv_df.iloc[:, 2:].std(axis=1)
+    cv_df["cv"] = cv_df["std"] / cv_df["mean"]
+    # Average CV per method and return the dictionary of method -> avg CV
+    avg_cv = cv_df.groupby("method")["cv"].mean().to_dict()
+    return avg_cv
+
+def summary_to_latex(
+        summary_df, 
+        avg_cv, 
+        filename="summary.tex", 
+        pairwise_p_rel=None, 
+        pairwise_p_rank=None
+    ):
     # header/footer unchanged
     header = r"""
     \begin{table}
     \caption{
         \textbf{Overall performance comparison of LMABO against all baselines across 60 optimization problems}. 
-        For each problem, we compute the total Area Under the Regret Curve (AUC) for each method by summing the AUCs from its 10 independent runs. 
-        The \textbf{Relative Performance (RP)} is calculated by normalizing each method's total AUC against the best-performing method for that problem (which receives an RP of 1.0); 
-        we report the mean and interquartile range of these RPs across all 60 problems. 
-        The \textbf{Mean Rank} is computed by ranking methods on each problem from 1 (best) to 19 (worst) based on their total AUC and then averaging these ranks across all problems. 
-        Friedman tests confirm a statistically significant difference between methods for both RP and rank.
-        The p-values in the last two columns are derived from a one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction comparing the distribution of RPs (or ranks) for each baseline against LMABO. 
-        A low p-value indicates a statistically significant outperformance by LMABO. 
-        Results in bold highlight the best performance for each metric.
+        The p-values from the Friedman test in the last row indicate statistically significant differences among methods for both RP and rank.
+        The p-values from the one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction are shown next to the reported metric value of each method.
         It should be noted that both RP and rank include ablation methods (which is why the maximum rank is 23 instead of 19).
         Separate results for the ablation methods are provided in Table \ref{tab:ablation}.
     }
     \label{tab:aggregated}
     \centering
     \renewcommand{\arraystretch}{1.2}
-    \begin{tabular}{@{}lccrr@{}}
+    \begin{tabular}{@{}lccccc@{}}
     \toprule
-    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular}\\
-    \multicolumn{4}{l}{\textit{Static Acquisition Functions}} \\
+    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+    \multicolumn{5}{l}{\textit{Static Acquisition Functions}} \\
     """
     footer = r"""\bottomrule
     \end{tabular}
@@ -351,12 +362,14 @@ def summary_to_latex(summary_df, filename="summary.tex", pairwise_p_rel=None, pa
         p_rank = (pairwise_p_rank.get(m) if pairwise_p_rank is not None else None)
         p_rel_str = f"{p_rel:.3e}" if p_rel is not None else "--"
         p_rank_str = f"{p_rank:.3e}" if p_rank is not None else "--"
+        cv = avg_cv.get(m, None)
+        cv_str = f"{cv:.3f}" if cv is not None else "--"
 
-        rows.append(f"{display} & {perf_str} & {rank_str} & {p_rel_str} & {p_rank_str} \\\\")
+        rows.append(f"{display} & {perf_str} & {p_rel_str} & {rank_str} & {p_rank_str} & {cv_str} \\\\")
         if m == "qJES":
-            rows.append(r"\multicolumn{4}{l}{\textit{LLM-based Methods}} \\")
+            rows.append(r"\multicolumn{5}{l}{\textit{LLM-based Methods}} \\")
         elif m == "llmgp":
-            rows.append(r"\multicolumn{4}{l}{\textit{Adaptive Portfolio Methods}} \\")
+            rows.append(r"\multicolumn{5}{l}{\textit{Adaptive Portfolio Methods}} \\")
         elif m == "esp":
             rows.append(r"\midrule")
 
@@ -365,7 +378,13 @@ def summary_to_latex(summary_df, filename="summary.tex", pairwise_p_rel=None, pa
         f.write(table)
     print(f"Wrote LaTeX summary to {filename}")
 
-def ablation_summary_to_latex(summary_df, filename):
+def ablation_summary_to_latex(
+        summary_df, 
+        avg_cv, 
+        filename,
+        pairwise_p_rel=None, 
+        pairwise_p_rank=None
+    ):
     # header/footer unchanged
     header = r"""
     \begin{table}
@@ -380,8 +399,8 @@ def ablation_summary_to_latex(summary_df, filename):
     \renewcommand{\arraystretch}{1.2}
     \begin{tabular}{@{}lccrr@{}}
     \toprule
-    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular}\\
-    \multicolumn{4}{l}{\textit{Ablation Methods}} \\
+    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+    \multicolumn{5}{l}{\textit{Ablation Methods}} \\
     """
     footer = r"""
     \bottomrule
@@ -406,12 +425,14 @@ def ablation_summary_to_latex(summary_df, filename):
         perf_str = f"{mean:.3f} ({q1:.3f}--{q3:.3f})"
         rank_str = f"{mean_r:.2f} ({min_r}--{max_r})"
 
-        p_rel = None
-        p_rank = None
+        p_rel = (pairwise_p_rel.get(m) if pairwise_p_rel is not None else None)
+        p_rank = (pairwise_p_rank.get(m) if pairwise_p_rank is not None else None)
         p_rel_str = f"{p_rel:.3e}" if p_rel is not None else "--"
         p_rank_str = f"{p_rank:.3e}" if p_rank is not None else "--"
+        cv = avg_cv.get(m, None)
+        cv_str = f"{cv:.3f}" if cv is not None else "--"
 
-        rows.append(f"{display} & {perf_str} & {rank_str} & {p_rel_str} & {p_rank_str} \\\\")
+        rows.append(f"{display} & {perf_str} & {p_rel_str} & {rank_str} & {p_rank_str} & {cv_str} \\\\")
         if m == "lmabo-ops":
             rows.append(r"\midrule")
 
@@ -509,20 +530,13 @@ if __name__=="__main__":
     all_methods = list(ACQ_TYPE_MAPPING.keys())
     all_methods.extend(list(ALGO_FILE_COUNT.keys()))
     # all_problems = OBJECTIVE_FUNCTIONS_NAMES
-    all_problems = final_methods
+    all_problems = final_problems
     # exclude some methods during the main report
     excluded_methods = [
-        # "no_past_bo",
-        # "setup_bo",
-        # "esp",
-        # "lmabo-ops", # ablation method
-        # "lmabo-ab1", # ablation method
-        # "lmabo-ab2", # ablation method
-        # "lmabo-ab3", # ablation method
-        "bo_alternating_k1", # ablation method
-        "bo_alternating_k3", # ablation method
-        "bo_alternating_k5", # ablation method
-        "bo_explore_exploit", # ablation method
+        "bo_alternating_k1", 
+        "bo_alternating_k3", 
+        "bo_alternating_k5", 
+        "bo_explore_exploit", 
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
@@ -540,6 +554,7 @@ if __name__=="__main__":
     )
     all_simple_regrets = cal_simple_regret(all_raw_results, empirical_optimum)
     agg_simple_regrets_df = aggregate_and_to_df(all_simple_regrets, "auc")
+    avg_cv = calculate_coefficient_of_variation(agg_simple_regrets_df)
     rel_performance_df = get_relative_performance_and_rank(agg_simple_regrets_df, completed_problems)
     temp_summary_df = summary_by_method(rel_performance_df)
     print(temp_summary_df.to_string(index=False))
@@ -581,13 +596,17 @@ if __name__=="__main__":
         # regenerate LaTeX table including p-values
         summary_to_latex(
             summary_df,
+            avg_cv,
             filename="summary.tex",
             pairwise_p_rel=pairwise_p_rel,
             pairwise_p_rank=pairwise_p_rank,
         )
         ablation_summary_to_latex(
             summary_df,
+            avg_cv,
             filename="summary_ablation.tex",
+            pairwise_p_rel=pairwise_p_rel,
+            pairwise_p_rank=pairwise_p_rank,
         )
 
         # # optional: save pairwise table for inspection
