@@ -5,7 +5,7 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --time=12:00:00 
-#SBATCH --mem=10G                    
+#SBATCH --mem=8G                    
 #SBATCH --cpus-per-gpu=8             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
@@ -19,21 +19,21 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    "Ackley" 
-    "Beale" 
-    "Bukin" 
-    "Cosine8" 
-    "DixonPrice" 
-    "DropWave" 
-    "EggHolder" 
-    "Griewank" 
-    "Hartmann" 
-    "HolderTable" 
-    "Levy" 
-    "Michalewicz" 
-    "Shekel" 
-    "SixHumpCamel" 
-    "StyblinskiTang" 
+    # "Ackley" 
+    # "Beale" 
+    # "Bukin" 
+    # "Cosine8" 
+    # "DixonPrice" 
+    # "DropWave" 
+    # "EggHolder" 
+    # "Griewank" 
+    # "Hartmann" 
+    # "HolderTable" 
+    # "Levy" 
+    # "Michalewicz" 
+    # "Shekel" 
+    # "SixHumpCamel" 
+    # "StyblinskiTang" 
     # "BucheRastrigin" 
     # "LinearSlope" 
     # "AttractiveSector" 
@@ -63,7 +63,7 @@ problems=(
     # "hpt_wine_DecisionTree"
     # "hpt_wine_SVM"
     # "hpt_wine_AdaBoost"
-    # "hpt_wine_MLPSGD"
+    "hpt_wine_MLPSGD"
     # "hpt_diabetes_RandomForest"
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
@@ -90,17 +90,17 @@ run_batch() {
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 2 problems for 20 problems
+# Split into batches of 2 problems for 10 problems
 echo "Running problems in batches of 2..."
 run_batch "${problems[@]:0:2}"    # Problems 0-1
 run_batch "${problems[@]:2:2}"    # Problems 2-3
 run_batch "${problems[@]:4:2}"    # Problems 4-5
 run_batch "${problems[@]:6:2}"    # Problems 6-7
 run_batch "${problems[@]:8:2}"    # Problems 8-9
-run_batch "${problems[@]:10:2}"   # Problems 10-11
-run_batch "${problems[@]:12:2}"   # Problems 12-13
-run_batch "${problems[@]:14:2}"   # Problems 14-15
-run_batch "${problems[@]:15:3}"  # Problems 15-17
-run_batch "${problems[@]:18:2}"  # Problems 18-19
+# run_batch "${problems[@]:10:2}"   # Problems 10-11
+# run_batch "${problems[@]:12:2}"   # Problems 12-13
+# run_batch "${problems[@]:14:2}"   # Problems 14-15
+# run_batch "${problems[@]:15:3}"  # Problems 15-17
+# run_batch "${problems[@]:18:2}"  # Problems 18-19
 
 echo "All problems completed!"

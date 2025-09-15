@@ -12,4 +12,6 @@ module load Anaconda3
 source activate
 conda activate lmabo
 
-python report.py
+python report.py --setting full
+# python report.py --setting synthetic
+# python report.py --setting real
