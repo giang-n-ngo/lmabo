@@ -92,7 +92,8 @@ class QwenChatbot:
         self.hosted = hosted
         self.max_tokens = 2048  # Reduced from 4096 to leave more room for context
         self.top_p = 0.9  # Nucleus sampling probability
-        print(f"Loading model: {model_name}")
+        self.model_name = model_name
+        print(f"Loading model: {self.model_name}")
         if hosted:
             from openai import OpenAI
             openai_api_key = "EMPTY"
@@ -107,7 +108,7 @@ class QwenChatbot:
             from vllm import LLM, SamplingParams
             # Initialize vLLM with optimized settings
             self.llm = LLM(
-                model=model_name,
+                model=self.model_name,
                 gpu_memory_utilization=0.3,  # Use 80% of GPU memory
                 max_model_len=16384,         # Maximum sequence length
                 dtype="float16",             # Use half precision for efficiency
@@ -248,7 +249,7 @@ class QwenChatbot:
             if self.hosted:
                 # call the client API for hosted models
                 outputs = self.client.chat.completions.create(
-                    model="Qwen/Qwen3-8B",
+                    model=self.model_name,
                     messages=[
                         {"role": "user", "content": prompt}
                     ],
@@ -290,10 +291,10 @@ class QwenChatbot:
         """Get the current conversation history."""
         return self.history.copy()
 
-def configure_and_start_chat_ops(first_prompt, server_node="localhost"):
+def configure_and_start_chat_ops(first_prompt, server_node="localhost", ops_model_name="Qwen/Qwen3-8B"):
     # Load Qwen3 model and tokenizer from Hugging Face Hub
-    chatbot = QwenChatbot(model_name="Qwen/Qwen3-8B", hosted=True, server_node=server_node)
-    print("Initialized Qwen3")
+    chatbot = QwenChatbot(model_name=ops_model_name, hosted=True, server_node=server_node)
+    print(f"Initialized {ops_model_name}")
     # Start a conversation
     response = chatbot.generate_response(first_prompt)
     print("Assistant:", response.strip())
@@ -306,7 +307,8 @@ class ConversationHolder:
         first_prompt="",
         full_choice_list=[],
         server_node="localhost",  # Default to localhost if not specified,
-        default_choice="UCB"
+        default_choice="UCB",
+        ops_model_name="Qwen/Qwen3-8B",
     ):
         self.llm = llm
         self.full_choice_list = full_choice_list
@@ -320,7 +322,7 @@ class ConversationHolder:
             self.api_max_entries = 10
             self.api_max_delay_seconds = 120
         elif self.llm == "ops":
-            self.chatbot = configure_and_start_chat_ops(first_prompt, server_node)
+            self.chatbot = configure_and_start_chat_ops(first_prompt, server_node, ops_model_name)
             self.messages.append(self.chatbot.history[-1]["content"])
         self.default_choice = default_choice
 

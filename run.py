@@ -175,6 +175,7 @@ def run_problem(
         if acq_type in [
             "lmabo", 
             "lmabo-ops", 
+            "lmabo-ops2",
             "lmabo-ab1", 
             "lmabo-ab2", 
             "lmabo-ab3",
@@ -192,10 +193,10 @@ def run_problem(
                 "lmabo-ab4"
             ]:
                 llm = "api"
-            elif acq_type == "lmabo-ops":
+            elif acq_type in ["lmabo-ops", "lmabo-ops2"]:
                 llm = "ops"
             # run LMABO
-            if acq_type in ["lmabo", "lmabo-ops"]:
+            if acq_type in ["lmabo", "lmabo-ops", "lmabo-ops2"]:
                 LMABO = LanguageModelAssistedAdaptiveBO(
                     objective_func, 
                     fixed_train_X, 
@@ -204,6 +205,7 @@ def run_problem(
                     num_iterations,
                     llm,
                     server_node,
+                    ops_model_name="Qwen/Qwen3-14B" if acq_type == "lmabo-ops2" else "Qwen/Qwen3-8B"
                 )
             elif acq_type in [
                 "lmabo-ab1", 
@@ -345,6 +347,7 @@ def parse_arguments():
                            "bo", 
                            "lmabo", 
                            "lmabo-ops", 
+                           "lmabo-ops2",
                            "lmabo-ab1",
                            "lmabo-ab2",
                            "lmabo-ab3",
