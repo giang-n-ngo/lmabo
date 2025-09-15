@@ -95,6 +95,7 @@ ACQ_TYPE_MAPPING = {
 ALGO_FILE_COUNT = {
     "lmabo": 6,
     "lmabo-ops": 6,
+    "lmabo-ops2": 6,
     "lmabo-ab1": 6,
     "lmabo-ab2": 6,
     "lmabo-ab3": 6,

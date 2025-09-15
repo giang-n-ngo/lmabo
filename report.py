@@ -246,6 +246,7 @@ methods_order_ablation = [
     "lmabo-ab4",
     "lmabo-ab5",
     "lmabo-ops",
+    "lmabo-ops2",
     "lmabo",
 ]
 
@@ -274,7 +275,8 @@ method_name_mapping = {
     "lmabo-ab3": "LMABO-AB3",
     "lmabo-ab4": "LMABO-AB4",
     "lmabo-ab5": "LMABO-AB5",
-    "lmabo-ops": "LMABO-OPS",
+    "lmabo-ops": "LMABO-8B",
+    "lmabo-ops2": "LMABO-14B",
 }
 
 def get_mean_iqr_summary(rel_performance_df):
@@ -577,10 +579,6 @@ if __name__=="__main__":
         "bo_alternating_k3", 
         "bo_alternating_k5", 
         "bo_explore_exploit", 
-        "gphedge-curated",
-        "no_past_bo-curated",
-        "setup_bo-curated",
-        "esp-curated",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
