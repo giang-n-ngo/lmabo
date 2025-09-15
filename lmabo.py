@@ -88,22 +88,33 @@ INFORMATION_SUMMARY_LIST = [
     """,
    ] 
 
-ACQUISITION_LIST = """
-Available acquisition functions you can choose from, with brief descriptions of their primary uses:
-1.  PI (Probability of Improvement)
-2.  LogPI (Log Probability of Improvement)
-3.  EI (Expected Improvement) 
-4.  LogEI (Log Expected Improvement) 
-5.  UCB (Upper Confidence Bound) 
-6.  PosMean (Posterior Mean):** 
-7.  PosSTD (Posterior Standard Deviation) 
-8.  TS (Thompson Sampling)
-9.  qKG (Knowledge Gradient) 
-10. qPES (Predictive Entropy Search) 
-11. qMES (Max-value Entropy Search)
-12. qJES (Joint Entropy Search) 
+ACQUISITION_LIST = [
+    # Main algorithm
+    """
+    Available acquisition functions you can choose from, with brief descriptions of their primary uses:
+    1.  PI (Probability of Improvement)
+    2.  LogPI (Log Probability of Improvement)
+    3.  EI (Expected Improvement) 
+    4.  LogEI (Log Expected Improvement) 
+    5.  UCB (Upper Confidence Bound) 
+    6.  PosMean (Posterior Mean) 
+    7.  PosSTD (Posterior Standard Deviation) 
+    8.  TS (Thompson Sampling)
+    9.  qKG (Knowledge Gradient) 
+    10. qPES (Predictive Entropy Search) 
+    11. qMES (Max-value Entropy Search)
+    12. qJES (Joint Entropy Search) 
 
-"""
+    """,
+    # Ablation 5: Portfolio sensitivity
+    """
+    Available acquisition functions you can choose from, with brief descriptions of their primary uses:
+    1.  EI (Expected Improvement) 
+    2.  UCB (Upper Confidence Bound) 
+    3.  TS (Thompson Sampling)
+
+    """,
+]
 
 INSTRUCTION_LIST =[
     # Main algorithm
@@ -165,15 +176,17 @@ INSTRUCTION_LIST =[
 
 INITIAL_PROMPT_LIST = [
     # Main algorithm
-    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[0] + ACQUISITION_LIST + INSTRUCTION_LIST[0],
+    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[0] + ACQUISITION_LIST[0] + INSTRUCTION_LIST[0],
     # Ablation 1
-    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[1] + ACQUISITION_LIST + INSTRUCTION_LIST[1],
+    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[1] + ACQUISITION_LIST[0] + INSTRUCTION_LIST[1],
     # Ablation 2
-    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[2] + ACQUISITION_LIST + INSTRUCTION_LIST[2],
+    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[2] + ACQUISITION_LIST[0] + INSTRUCTION_LIST[2],
     # Ablation 3
-    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[3] + ACQUISITION_LIST + INSTRUCTION_LIST[0],
+    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[3] + ACQUISITION_LIST[0] + INSTRUCTION_LIST[0],
     # Ablation 4
-    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[0] + ACQUISITION_LIST + INSTRUCTION_LIST[3],
+    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[0] + ACQUISITION_LIST[0] + INSTRUCTION_LIST[3],
+    # Ablation 5
+    PROMPT_OPENING + INFORMATION_SUMMARY_LIST[0] + ACQUISITION_LIST[1] + INSTRUCTION_LIST[0],
 ]
 
 FOLLOW_UP_PROMPT_TEMPLATE_LIST = [
@@ -233,6 +246,18 @@ FOLLOW_UP_PROMPT_TEMPLATE_LIST = [
     - Lengthscales: Range [{min_ls:.3f}, {max_ls:.3f}], Mean {mean_ls:.3f} (Std Dev {std_ls:.3f})
     - Outputscale: {outputscale}
     """,    
+    # Ablation 5
+    """
+    Current optimization state:
+    - N: {N} 
+    - Remaining iterations: {remaining}
+    - D: {D}
+    - f_range: Range [{f_min:.3f}, {f_max:.3f}], Mean {f_mean:.3f} (Std Dev {f_std:.3f})
+    - f_min: {f_min:.3f}
+    - Shortest distance: {shortest_dist}
+    - Lengthscales: Range [{min_ls:.3f}, {max_ls:.3f}], Mean {mean_ls:.3f} (Std Dev {std_ls:.3f})
+    - Outputscale: {outputscale}
+    """,
 ]
 
 FINAL_GUESS = """
@@ -351,7 +376,7 @@ class LanguageModelAssistedAdaptiveBOAblation(LanguageModelAssistedAdaptiveBO):
         llm="api",
         server_node="localhost"
     ):
-        assert ablation_id in [1, 2, 3, 4], "ablation_id must be 1, 2, 3, or 4"
+        assert ablation_id in [1, 2, 3, 4, 5], "ablation_id must be 1, 2, 3, 4, or 5"
         self.ablation_id = ablation_id
         super().__init__(
             objective_func,
@@ -384,7 +409,7 @@ class LanguageModelAssistedAdaptiveBOAblation(LanguageModelAssistedAdaptiveBO):
                 'std_ls': np.std(self.lengthscales),
                 'outputscale': self.outputscale
             })
-        if self.ablation_id in [2, 3, 4]:
+        if self.ablation_id in [2, 3, 4, 5]:
             stats['remaining'] = self.remaining_iterations
         prompt = FOLLOW_UP_PROMPT_TEMPLATE_LIST[self.ablation_id].format(**stats)
         print(f"Iter {len(self.acq_type_list)}|", prompt)

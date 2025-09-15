@@ -172,13 +172,18 @@ def run_problem(
             objective_func
         )
         acq_type_list, choice_list, messages, weights = None, None, None, None
+        if "curated" in acq_type:
+            af_portfolio = ["EI", "LogEI", "TS"]
+        else:
+            af_portfolio = list(ACQ_TYPE_MAPPING.keys())
         if acq_type in [
             "lmabo", 
             "lmabo-ops", 
             "lmabo-ab1", 
             "lmabo-ab2", 
             "lmabo-ab3",
-            "lmabo-ab4"
+            "lmabo-ab4",
+            "lmabo-ab5"
         ]:
             from lmabo import (
                 LanguageModelAssistedAdaptiveBO, 
@@ -189,7 +194,8 @@ def run_problem(
                 "lmabo-ab1", 
                 "lmabo-ab2", 
                 "lmabo-ab3", 
-                "lmabo-ab4"
+                "lmabo-ab4",
+                "lmabo-ab5"
             ]:
                 llm = "api"
             elif acq_type == "lmabo-ops":
@@ -209,7 +215,8 @@ def run_problem(
                 "lmabo-ab1", 
                 "lmabo-ab2", 
                 "lmabo-ab3",
-                "lmabo-ab4"
+                "lmabo-ab4",
+                "lmabo-ab5"
             ]:
                 ablation_id = int(acq_type[-1])
                 LMABO = LanguageModelAssistedAdaptiveBOAblation(
@@ -243,39 +250,38 @@ def run_problem(
         #     # optimize and get results
         #     simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
         #     del LMABO2  # Free memory
-        elif acq_type == "gphedge":
+        elif acq_type in ["gphedge", "gphedge-curated"]:
             from baselines.gp_hedge import gp_hedge_full_loop
-            # run GP-Hedge
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = gp_hedge_full_loop(
                 objective_func,
-                list(ACQ_TYPE_MAPPING.keys()),
+                af_portfolio,
                 fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
             )   
-        elif acq_type == "esp":
+        elif acq_type in ["esp", "esp-curated"]:
             from baselines.esp import esp_full_loop
             simple_regret, cum_regret, train_X, train_Y, acq_type_list = esp_full_loop(
                 objective_func,
-                list(ACQ_TYPE_MAPPING.keys()),
+                af_portfolio,
                 fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
             )
-        elif acq_type == "no_past_bo":
+        elif acq_type in ["no_past_bo", "no_past_bo-curated"]:
             from baselines.no_past_bo import no_past_bo_full_loop
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = no_past_bo_full_loop(
                 objective_func,
-                list(ACQ_TYPE_MAPPING.keys()),
+                af_portfolio,
                 fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
             )
-        elif acq_type == "setup_bo":
+        elif acq_type in ["setup_bo", "setup_bo-curated"]:
             from baselines.setup_bo import setup_bo_full_loop
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = setup_bo_full_loop(
                 objective_func,
-                list(ACQ_TYPE_MAPPING.keys()),
+                af_portfolio,
                 fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
@@ -349,12 +355,15 @@ def parse_arguments():
                            "lmabo-ab2",
                            "lmabo-ab3",
                            "lmabo-ab4",
-                        #    "lmabo2",
-                        #    "lmabo2-ops",
+                           "lmabo-ab5",
                            "gphedge", 
+                           "gphedge-curated",
                            "no_past_bo",
+                           "no_past_bo-curated",
                            "setup_bo",
+                           "setup_bo-curated",
                            "esp",
+                            "esp-curated",
                            "bo_alternating",
                            "bo_explore_exploit",
                            "bo_explore_exploit_with_probability"

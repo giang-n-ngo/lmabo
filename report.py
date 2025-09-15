@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import os
 import sys
+import argparse
 from scipy import stats
 from statsmodels.stats.multitest import multipletests
 
@@ -243,6 +244,7 @@ methods_order_ablation = [
     "lmabo-ab2",
     "lmabo-ab3",
     "lmabo-ab4",
+    "lmabo-ab5",
     "lmabo-ops",
     "lmabo",
 ]
@@ -263,14 +265,15 @@ method_name_mapping = {
     "llambo": "LLAMBO",
     "llmgp": "LLMP",
     "gphedge": "GP-Hedge",
-    "no_past_bo": "No-Past-BO",
-    "setup_bo": "Setup-BO",
+    "no_past_bo": "No-PASt-BO",
+    "setup_bo": "SETUP-BO",
     "esp": "ESP",
     "lmabo": "LMABO",
     "lmabo-ab1": "LMABO-AB1",
     "lmabo-ab2": "LMABO-AB2",
     "lmabo-ab3": "LMABO-AB3",
     "lmabo-ab4": "LMABO-AB4",
+    "lmabo-ab5": "LMABO-AB5",
     "lmabo-ops": "LMABO-OPS",
 }
 
@@ -525,18 +528,59 @@ def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, cont
     return {"friedman": friedman_res, "pairwise": pairwise_df, "methods": methods}
 
 if __name__=="__main__":
-    sys.stdout = open(f"report_bo.txt", 'w')
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description="Generate BO experiment report")
+    parser.add_argument(
+        "--setting",
+        type=str,
+        default="full",
+        choices=["full", "hd", "synthetic", "real"],
+        help="Summary setting: full problem lists or something else",
+    )
+    args = parser.parse_args()
+    sys.stdout = open(f"report_bo_{args.setting}.txt", 'w')
 
     all_methods = list(ACQ_TYPE_MAPPING.keys())
     all_methods.extend(list(ALGO_FILE_COUNT.keys()))
     # all_problems = OBJECTIVE_FUNCTIONS_NAMES
-    all_problems = final_problems
+    if args.setting == "full":
+        all_problems = final_problems
+    elif args.setting == "hd":
+        # high-dimensional problems only
+        all_problems = [
+            "Ackley",
+            "Rosenbrock",
+            "Rastrigin",
+            "StyblinskiTang",
+        ]
+        # remove ablation methods from all_methods
+        ablation_methods = [
+            "lmabo-ab1",
+            "lmabo-ab2",
+            "lmabo-ab3",
+            "lmabo-ab4",
+            "lmabo-ab5",
+            "lmabo-ops",
+            "lmabo-ops2",
+        ]
+        all_methods = [method for method in all_methods if method not in ablation_methods]
+    elif args.setting == "synthetic":
+        from constants import BOTORCH_FUNCTIONS_NAMES, COCO_FUNCTIONS_NAMES
+        # find the ones in final_problems and in botorch or coco
+        all_problems = [p for p in final_problems if p in BOTORCH_FUNCTIONS_NAMES or p in COCO_FUNCTIONS_NAMES]
+    elif args.setting == "real":
+        from constants import HPT_FUNCTIONS_NAMES
+        all_problems = [p for p in final_problems if p in HPT_FUNCTIONS_NAMES]
     # exclude some methods during the main report
     excluded_methods = [
         "bo_alternating_k1", 
         "bo_alternating_k3", 
         "bo_alternating_k5", 
         "bo_explore_exploit", 
+        "gphedge-curated",
+        "no_past_bo-curated",
+        "setup_bo-curated",
+        "esp-curated",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
@@ -597,17 +641,19 @@ if __name__=="__main__":
         summary_to_latex(
             summary_df,
             avg_cv,
-            filename="summary.tex",
+            filename=f"summary_{args.setting}.tex",
             pairwise_p_rel=pairwise_p_rel,
             pairwise_p_rank=pairwise_p_rank,
         )
-        ablation_summary_to_latex(
-            summary_df,
-            avg_cv,
-            filename="summary_ablation.tex",
-            pairwise_p_rel=pairwise_p_rel,
-            pairwise_p_rank=pairwise_p_rank,
-        )
+        if args.setting == "full":
+            # also generate ablation table
+            ablation_summary_to_latex(
+                summary_df,
+                avg_cv,
+                filename="summary_ablation.tex",
+                pairwise_p_rel=pairwise_p_rel,
+                pairwise_p_rank=pairwise_p_rank,
+            )
 
         # # optional: save pairwise table for inspection
         # pairwise_df.to_csv("pairwise_holm_pvalues.csv")
