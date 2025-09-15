@@ -4,7 +4,7 @@
 # Each run generates 6 files, so number of runs = total files / 6
 
 RESULTS_DIR="/home/s222509501/LMABO/lmabo/numerical_results"
-METHOD="lmabo-ops"
+METHOD="lmabo-ops2"
 
 echo "Checking number of runs for $METHOD in each problem..."
 echo "=================================================="

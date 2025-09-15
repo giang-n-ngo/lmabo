@@ -78,18 +78,18 @@ OBJECTIVE_FUNCTIONS_NAMES = \
      + HPT_FUNCTIONS_NAMES
 
 ACQ_TYPE_MAPPING = {
-    "PI": "Probability of Improvement",
-    "LogPI": "Log Probability of Improvement",
-    "EI": "Expected Improvement",
-    "LogEI": "Log Expected Improvement",
-    "UCB": "Upper Confidence Bound",
-    "PosMean": "Posterior Mean",
-    "PosSTD": "Posterior Standard Deviation",
-    "TS": "Thompson Sampling",
-    "qKG": "Knowledge Gradient",
-    "qPES": "Predictive Entropy Search",
-    "qMES": "Max-value Entropy Search",
-    "qJES": "Joint Entropy Search"
+    "PI": "PI",
+    "LogPI": "LogPI",
+    "EI": "EI",
+    "LogEI": "LogEI",
+    "UCB": "UCB",
+    "PosMean": "PosMean",
+    "PosSTD": "PosSTD",
+    "TS": "TS",
+    "qKG": "KG",
+    "qPES": "PES",
+    "qMES": "MES",
+    "qJES": "JES"
 }
 
 ALGO_FILE_COUNT = {
@@ -99,10 +99,15 @@ ALGO_FILE_COUNT = {
     "lmabo-ab2": 6,
     "lmabo-ab3": 6,
     "lmabo-ab4": 6,
+    "lmabo-ab5": 6,
     "gphedge": 6,
+    "gphedge-curated": 6,
     "no_past_bo": 6,
+    "no_past_bo-curated": 6,
     "setup_bo": 6,
+    "setup_bo-curated": 6,
     "esp": 5,
+    "esp-curated": 5,
     # "lmabo2": 7,
     "llmgp": 3,
     "llambo": 3,

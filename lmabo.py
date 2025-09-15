@@ -276,7 +276,8 @@ class LanguageModelAssistedAdaptiveBO:
         num_iterations,
         llm="api",
         server_node="localhost",
-        initial_prompt=None
+        initial_prompt=None,
+        ops_model_name="Qwen/Qwen3-8B"
     ):
         self.objective_func = objective_func
         self.train_X  = X_init.clone()
@@ -296,7 +297,8 @@ class LanguageModelAssistedAdaptiveBO:
             first_prompt=initial_prompt if initial_prompt is not None else INITIAL_PROMPT_LIST[0], 
             full_choice_list=list(ACQ_TYPE_MAPPING.keys()),
             server_node=server_node,
-            default_choice="UCB"  # Default acquisition function
+            default_choice="UCB",  # Default acquisition function
+            ops_model_name=ops_model_name
         )
 
     def _construct_prompt(self):
