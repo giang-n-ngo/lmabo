@@ -1,12 +1,13 @@
 #!/bin/bash
-#SBATCH --output=log/lmabo-ops2-2.out
-#SBATCH --error=log/lmabo-ops2-2.err
+#SBATCH --job-name=lmabo-ops2-1
+#SBATCH --output=log/lmabo-ops2-1.out
+#SBATCH --error=log/lmabo-ops2-1.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --time=48:00:00 
 #SBATCH --mem=20GB                    
-#SBATCH --cpus-per-gpu=24             
+#SBATCH --cpus-per-gpu=20             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -39,7 +40,7 @@ problems=(
     # "AttractiveSector" 
     # "StepEllipsoid" 
     # "Discus" 
-    # "BentCigar" 
+    "BentCigar" 
     # "SharpRidge" 
     # "DifferentPowers" 
     # "Weierstrass" 
@@ -63,11 +64,11 @@ problems=(
     # "hpt_wine_DecisionTree"
     # "hpt_wine_SVM"
     # "hpt_wine_AdaBoost"
-    # "hpt_wine_MLPSGD"
+    "hpt_wine_MLPSGD"
     # "hpt_diabetes_RandomForest"
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
-    # "hpt_diabetes_AdaBoost"
+    "hpt_diabetes_AdaBoost"
     # "hpt_diabetes_MLPSGD"
 )
 
@@ -84,19 +85,17 @@ run_batch() {
         elif [ "$method" == "bo_alternating_k5" ]; then
             CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method bo_alternating --k 5 &
         else
-            CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method $method --server_node $server_node &
+            CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops2 --server_node h100-m-01 &
         fi
     done
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 4 problems for 7 problems
-echo "Running problems in batches of 4..."
-run_batch "${problems[@]:0:4}"    # Problems 0-3
-run_batch "${problems[@]:4:3}"    # Problems 4-6
-# run_batch "${problems[@]:8:4}"    # Problems 8-11
-# run_batch "${problems[@]:12:4}"   # Problems 12-15
-# run_batch "${problems[@]:20:5}"   # Problems 20-24
+# Split into batches of 5 problems for 14 problems
+echo "Running problems in batches of 5..."
+run_batch "${problems[@]:0:4}"    # Problems 0-4
+# run_batch "${problems[@]:5:5}"    # Problems 5-9
+# run_batch "${problems[@]:10:4}"   # Problems 10-13
 # run_batch "${problems[@]:39:3}"   # Problems 39-41
 # run_batch "${problems[@]:42:3}"   # Problems 42-44
 # run_batch "${problems[@]:45:3}"   # Problems 45-47
