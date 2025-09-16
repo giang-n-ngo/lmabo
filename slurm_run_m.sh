@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=lmabo-ops2-1
-#SBATCH --output=log/lmabo-ops2-1.out
-#SBATCH --error=log/lmabo-ops2-1.err
+#SBATCH --job-name=lmabo-ops2-2
+#SBATCH --output=log/lmabo-ops2-2.out
+#SBATCH --error=log/lmabo-ops2-2.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
@@ -34,13 +34,13 @@ problems=(
     # "Michalewicz" 
     # "Shekel" 
     # "SixHumpCamel" 
-    # "StyblinskiTang" 
+    "StyblinskiTang" 
     # "BucheRastrigin" 
     # "LinearSlope" 
     # "AttractiveSector" 
     # "StepEllipsoid" 
     # "Discus" 
-    "BentCigar" 
+    # "BentCigar" 
     # "SharpRidge" 
     # "DifferentPowers" 
     # "Weierstrass" 
@@ -64,11 +64,11 @@ problems=(
     # "hpt_wine_DecisionTree"
     # "hpt_wine_SVM"
     # "hpt_wine_AdaBoost"
-    "hpt_wine_MLPSGD"
+    # "hpt_wine_MLPSGD"
     # "hpt_diabetes_RandomForest"
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
-    "hpt_diabetes_AdaBoost"
+    # "hpt_diabetes_AdaBoost"
     # "hpt_diabetes_MLPSGD"
 )
 
@@ -91,12 +91,11 @@ run_batch() {
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 5 problems for 14 problems
+# Split into batches of 5 problems for 12 problems
 echo "Running problems in batches of 5..."
-run_batch "${problems[@]:0:4}"    # Problems 0-4
+run_batch "${problems[@]:0:2}"    # Problems 0-4
 # run_batch "${problems[@]:5:5}"    # Problems 5-9
-# run_batch "${problems[@]:10:4}"   # Problems 10-13
-# run_batch "${problems[@]:39:3}"   # Problems 39-41
+# run_batch "${problems[@]:10:2}"   # Problems 10-11
 # run_batch "${problems[@]:42:3}"   # Problems 42-44
 # run_batch "${problems[@]:45:3}"   # Problems 45-47
 # run_batch "${problems[@]:48:3}"   # Problems 48-50

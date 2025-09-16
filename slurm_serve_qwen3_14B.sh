@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=qwen3-14b-2
-#SBATCH --output=log/qwen3_14b-2.out
-#SBATCH --error=log/qwen3_14b-2.err
+#SBATCH --job-name=qwen3-14b-1
+#SBATCH --output=log/qwen3_14b-1.out
+#SBATCH --error=log/qwen3_14b-1.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-large
 #SBATCH --gpus=h100:1
