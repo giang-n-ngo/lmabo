@@ -74,6 +74,17 @@ final_problems = [
     "hpt_diabetes_MLPSGD",
 ]
 
+methods_order_curated = [
+    "gphedge",
+    "gphedge-curated",
+    "no_past_bo",
+    "no_past_bo-curated",
+    "setup_bo",
+    "setup_bo-curated",
+    "esp",
+    "esp-curated",
+]
+
 def read_raw_result(problem, acq_type, result_type):
     raw_result = []
     for exp_idx in range(EXP_RUNS):
@@ -266,9 +277,13 @@ method_name_mapping = {
     "llambo": "LLAMBO",
     "llmgp": "LLMP",
     "gphedge": "GP-Hedge",
+    "gphedge-curated": "GP-Hedge-Curated",
     "no_past_bo": "No-PASt-BO",
+    "no_past_bo-curated": "No-PASt-BO-Curated",
     "setup_bo": "SETUP-BO",
+    "setup_bo-curated": "SETUP-BO-Curated",
     "esp": "ESP",
+    "esp-curated": "ESP-Curated",
     "lmabo": "LMABO",
     "lmabo-ab1": "LMABO-AB1",
     "lmabo-ab2": "LMABO-AB2",
@@ -440,6 +455,63 @@ def ablation_summary_to_latex(
         rows.append(f"{display} & {perf_str} & {p_rel_str} & {rank_str} & {p_rank_str} & {cv_str} \\\\")
         if m == "lmabo-ops":
             rows.append(r"\midrule")
+
+    table = header + "\n".join(rows) + "\n" + footer
+    with open(filename, "w") as f:
+        f.write(table)
+    print(f"Wrote LaTeX ablation summary to {filename}")
+
+def curated_summary_to_latex(        
+    summary_df, 
+    avg_cv, 
+    filename,
+    pairwise_p_rel=None, 
+    pairwise_p_rank=None
+):
+        # header/footer unchanged
+    header = r"""
+    \begin{table}
+    \caption{
+        \textbf{Comparing adaptive portfolio methods between using a large portfolio and a curated portfolio}. 
+    }
+    \label{tab:curated}
+    \centering
+    \renewcommand{\arraystretch}{1.2}
+    \begin{tabular}{@{}lccrr@{}}
+    \toprule
+    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+    """
+    footer = r"""
+    \bottomrule
+    \end{tabular}
+    \end{table}
+    """
+    rows = []
+    for m in methods_order_curated:
+        display = method_name_mapping[m]
+        if m not in summary_df.index:
+            rows.append(f"{display} & -- & -- & -- & -- \\\\")
+            continue
+
+        row = summary_df.loc[m]
+        mean = row["mean"]
+        q1 = row["Q1"]
+        q3 = row["Q3"]
+        mean_r = row["mean_rank"]
+        min_r = int(row["min_rank"])
+        max_r = int(row["max_rank"])
+
+        perf_str = f"{mean:.3f} ({q1:.3f}--{q3:.3f})"
+        rank_str = f"{mean_r:.2f} ({min_r}--{max_r})"
+
+        p_rel = (pairwise_p_rel.get(m) if pairwise_p_rel is not None else None)
+        p_rank = (pairwise_p_rank.get(m) if pairwise_p_rank is not None else None)
+        p_rel_str = f"{p_rel:.3e}" if p_rel is not None else "--"
+        p_rank_str = f"{p_rank:.3e}" if p_rank is not None else "--"
+        cv = avg_cv.get(m, None)
+        cv_str = f"{cv:.3f}" if cv is not None else "--"
+
+        rows.append(f"{display} & {perf_str} & {p_rel_str} & {rank_str} & {p_rank_str} & {cv_str} \\\\")
 
     table = header + "\n".join(rows) + "\n" + footer
     with open(filename, "w") as f:
@@ -649,6 +721,14 @@ if __name__=="__main__":
                 summary_df,
                 avg_cv,
                 filename="summary_ablation.tex",
+                pairwise_p_rel=pairwise_p_rel,
+                pairwise_p_rank=pairwise_p_rank,
+            )
+            # also generate curated table
+            curated_summary_to_latex(
+                summary_df,
+                avg_cv,
+                filename="summary_curated.tex",
                 pairwise_p_rel=pairwise_p_rel,
                 pairwise_p_rank=pairwise_p_rank,
             )

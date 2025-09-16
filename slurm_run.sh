@@ -31,7 +31,7 @@ problems=(
     # "HolderTable" 
     # "Levy" 
     # "Michalewicz" 
-    "Shekel" 
+    # "Shekel" 
     # "SixHumpCamel" 
     # "StyblinskiTang" 
     # "BucheRastrigin" 
