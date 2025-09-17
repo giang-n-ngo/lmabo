@@ -30,7 +30,7 @@ problems=(
     # "Griewank" 
     # "Hartmann" 
     # "HolderTable" 
-    "Levy" 
+    # "Levy" 
     # "Michalewicz" 
     # "Shekel" 
     # "SixHumpCamel" 
