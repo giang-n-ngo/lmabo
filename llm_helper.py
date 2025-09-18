@@ -90,7 +90,7 @@ class QwenChatbot:
             model_name: Hugging Face model name/path
         """
         self.hosted = hosted
-        self.max_tokens = 2048  # Reduced from 4096 to leave more room for context
+        self.max_tokens = 8192  # Increased from 4096 to leave more room for context
         self.top_p = 0.9  # Nucleus sampling probability
         self.model_name = model_name
         print(f"Loading model: {self.model_name}")
@@ -261,6 +261,8 @@ class QwenChatbot:
                     },
                 )
                 response = outputs.choices[0].message.content
+                if "</think>" in response:
+                    response = response.split("</think>")[1].strip()
             else:
                 # Generate response using vLLM
                 outputs = self.llm.generate([prompt], self.sampling_params)

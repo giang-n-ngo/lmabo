@@ -4,7 +4,8 @@ from constants import (
     BOTORCH_FUNCTIONS_NAMES,
     COCO_FUNCTIONS_NAMES,
     HPT_FUNCTIONS_NAMES,
-    ACQ_TYPE_MAPPING
+    ACQ_TYPE_MAPPING,
+    OPS_MODEL_MAPPING
 )   
 from test_functions.test_function_loader import load_objective_func
 
@@ -176,60 +177,32 @@ def run_problem(
             af_portfolio = ["EI", "LogEI", "TS"]
         else:
             af_portfolio = list(ACQ_TYPE_MAPPING.keys())
-        if acq_type in [
-            "lmabo", 
-            "lmabo-ops", 
-            "lmabo-ops2",
-            "lmabo-ab1", 
-            "lmabo-ab2", 
-            "lmabo-ab3",
-            "lmabo-ab4",
-            "lmabo-ab5"
-        ]:
+        if "lmabo" in acq_type:
             from lmabo import (
                 LanguageModelAssistedAdaptiveBO, 
                 LanguageModelAssistedAdaptiveBOAblation
             )
-            if acq_type in [
-                "lmabo", 
-                "lmabo-ab1", 
-                "lmabo-ab2", 
-                "lmabo-ab3", 
-                "lmabo-ab4",
-                "lmabo-ab5"
-            ]:
-                llm = "api"
-            elif acq_type in ["lmabo-ops", "lmabo-ops2"]:
-                llm = "ops"
+            llm = "api" if "ops" not in acq_type else "ops"
+            kwargs = {
+                "objective_func": objective_func,
+                "X_init": fixed_train_X,
+                "Y_init": fixed_train_Y,
+                "bounds": bounds,
+                "num_iterations": num_iterations,
+                "llm": llm,
+                "server_node": server_node,
+            }
             # run LMABO
-            if acq_type in ["lmabo", "lmabo-ops", "lmabo-ops2"]:
-                LMABO = LanguageModelAssistedAdaptiveBO(
-                    objective_func, 
-                    fixed_train_X, 
-                    fixed_train_Y, 
-                    bounds, 
-                    num_iterations,
-                    llm,
-                    server_node,
-                    ops_model_name="Qwen/Qwen3-14B" if acq_type == "lmabo-ops2" else "Qwen/Qwen3-8B"
-                )
-            elif acq_type in [
-                "lmabo-ab1", 
-                "lmabo-ab2", 
-                "lmabo-ab3",
-                "lmabo-ab4",
-                "lmabo-ab5"
-            ]:
+            if "-ab" in acq_type:
                 ablation_id = int(acq_type[-1])
                 LMABO = LanguageModelAssistedAdaptiveBOAblation(
-                    objective_func, 
-                    fixed_train_X, 
-                    fixed_train_Y, 
-                    bounds, 
-                    num_iterations,
-                    ablation_id,
-                    llm,
-                    server_node,
+                    ablation_id=ablation_id,
+                    **kwargs
+                )
+            else:
+                LMABO = LanguageModelAssistedAdaptiveBO(
+                    ops_model_name=OPS_MODEL_MAPPING[acq_type] if llm == "ops" else None,
+                    **kwargs
                 )
             # optimize and get results
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
@@ -349,28 +322,6 @@ def parse_arguments():
     parser.add_argument("--problem", type=str, default="Ackley", 
                        help="Function name to run optimization on")
     parser.add_argument("--method", type=str, default="bo",
-                       choices=[
-                           "bo", 
-                           "lmabo", 
-                           "lmabo-ops", 
-                           "lmabo-ops2",
-                           "lmabo-ab1",
-                           "lmabo-ab2",
-                           "lmabo-ab3",
-                           "lmabo-ab4",
-                           "lmabo-ab5",
-                           "gphedge", 
-                           "gphedge-curated",
-                           "no_past_bo",
-                           "no_past_bo-curated",
-                           "setup_bo",
-                           "setup_bo-curated",
-                           "esp",
-                            "esp-curated",
-                           "bo_alternating",
-                           "bo_explore_exploit",
-                           "bo_explore_exploit_with_probability"
-                       ],
                        help="Optimization method to use")
     parser.add_argument("--k", type=int, default=5,
                        help="Number of iterations to run each acquisition function before switching")

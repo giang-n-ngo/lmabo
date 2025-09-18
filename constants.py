@@ -96,6 +96,8 @@ ALGO_FILE_COUNT = {
     "lmabo": 6,
     "lmabo-ops": 6,
     "lmabo-ops2": 6,
+    "lmabo-ops3": 6,
+    "lmabo-ops4": 6,
     "lmabo-ab1": 6,
     "lmabo-ab2": 6,
     "lmabo-ab3": 6,
@@ -116,4 +118,11 @@ ALGO_FILE_COUNT = {
     "bo_alternating_k3": 4,
     "bo_alternating_k5": 4,
     "bo_explore_exploit": 4
+}
+
+OPS_MODEL_MAPPING = {
+    "lmabo-ops": "Qwen/Qwen-3-8B",
+    "lmabo-ops2": "Qwen/Qwen3-14B",
+    "lmabo-ops3": "Qwen/Qwen3-30B-A3B-Thinking-2507",
+    "lmabo-ops4": "Qwen/QwQ-32B",
 }
