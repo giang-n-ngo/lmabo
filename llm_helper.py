@@ -450,7 +450,6 @@ class ConversationHolder:
             response = self.chatbot.generate_response(prompt)
             if response:
                 llm_suggested_af = self._ops_process_suggestion_response(response.strip())
-                self.messages.append(response.strip())
             else:
                 print("LLM returned no text content in response.")
                 llm_suggested_af = self.default_choice # Or handle as an error
