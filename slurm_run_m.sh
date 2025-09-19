@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=lmabo-ops3-1
-#SBATCH --output=log/lmabo-ops3-1.out
-#SBATCH --error=log/lmabo-ops3-1.err
+#SBATCH --job-name=lmabo-ops3-2
+#SBATCH --output=log/lmabo-ops3-2.out
+#SBATCH --error=log/lmabo-ops3-2.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=a100:1
-#SBATCH --time=12:00:00 
+#SBATCH --time=18:00:00 
 #SBATCH --mem=24GB                    
 #SBATCH --cpus-per-gpu=24             
 #SBATCH --qos=batch-short
@@ -27,22 +27,22 @@ problems=(
     # "DixonPrice" 
     # "DropWave" 
     # "EggHolder" 
-    "Griewank" 
-    "Hartmann" 
-    "HolderTable" 
-    "Levy" 
-    "Michalewicz" 
-    "Shekel" 
-    "SixHumpCamel" 
-    "StyblinskiTang" 
-    "BucheRastrigin" 
-    "LinearSlope" 
-    "AttractiveSector" 
-    "StepEllipsoid" 
-    "Discus" 
-    "BentCigar" 
-    "SharpRidge" 
-    "DifferentPowers" 
+    # "Griewank" 
+    # "Hartmann" 
+    # "HolderTable" 
+    # "Levy" 
+    # "Michalewicz" 
+    # "Shekel" 
+    # "SixHumpCamel" 
+    # "StyblinskiTang" 
+    # "BucheRastrigin" 
+    # "LinearSlope" 
+    # "AttractiveSector" 
+    # "StepEllipsoid" 
+    # "Discus" 
+    # "BentCigar" 
+    # "SharpRidge" 
+    # "DifferentPowers" 
     # "Weierstrass" 
     # "SchaffersIllCond" 
     # "CompositeGriewankRosenbrock" 
@@ -50,14 +50,14 @@ problems=(
     # "Gallagher101" 
     # "Katsuura" 
     # "LunacekBiRastrigin" 
-    "hpt_breast_RandomForest"
-    "hpt_breast_DecisionTree"
-    "hpt_breast_SVM"
-    "hpt_breast_AdaBoost"
-    "hpt_breast_MLPSGD"
-    "hpt_digits_RandomForest"
-    "hpt_digits_DecisionTree"
-    "hpt_digits_SVM"
+    # "hpt_breast_RandomForest"
+    # "hpt_breast_DecisionTree"
+    # "hpt_breast_SVM"
+    # "hpt_breast_AdaBoost"
+    # "hpt_breast_MLPSGD"
+    # "hpt_digits_RandomForest"
+    # "hpt_digits_DecisionTree"
+    # "hpt_digits_SVM"
     # "hpt_digits_AdaBoost"
     # "hpt_digits_MLPSGD"
     # "hpt_wine_RandomForest"
@@ -82,12 +82,14 @@ run_batch() {
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 6 problems for 24 problems
+# Split into batches of 6 problems for 30 problems
 echo "Running problems in batches of 6..."
 run_batch "${problems[@]:0:6}"    # Problems 0-5
 run_batch "${problems[@]:6:6}"    # Problems 6-11
 run_batch "${problems[@]:12:6}"   # Problems 12-17
 run_batch "${problems[@]:18:6}"   # Problems 18-23
+run_batch "${problems[@]:24:6}"   # Problems 24-29
+# run_batch "${problems[@]:30:3}"   # Problems 30-32
 # run_batch "${problems[@]:48:3}"   # Problems 48-50
 # run_batch "${problems[@]:51:3}"   # Problems 51-53
 # run_batch "${problems[@]:54:3}"   # Problems 54-56

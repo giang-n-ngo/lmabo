@@ -18,7 +18,6 @@ source activate
 conda activate vllm_server
 
 vllm serve Qwen/QwQ-32B \
-    --max-model-len 262144 \
     --reasoning-parser deepseek_r1 \
     --gpu-memory-utilization 0.9 \
     --dtype auto \
