@@ -20,13 +20,13 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    # "Ackley" 
-    # "Beale" 
-    # "Bukin" 
-    # "Cosine8" 
-    # "DixonPrice" 
-    # "DropWave" 
-    # "EggHolder" 
+    "Ackley" 
+    "Beale" 
+    "Bukin" 
+    "Cosine8" 
+    "DixonPrice" 
+    "DropWave" 
+    "EggHolder" 
     # "Griewank" 
     # "Hartmann" 
     # "HolderTable" 
@@ -59,17 +59,17 @@ problems=(
     # "hpt_digits_DecisionTree"
     # "hpt_digits_SVM"
     # "hpt_digits_AdaBoost"
-    # "hpt_digits_MLPSGD"
-    # "hpt_wine_RandomForest"
-    # "hpt_wine_DecisionTree"
-    # "hpt_wine_SVM"
-    # "hpt_wine_AdaBoost"
-    # "hpt_wine_MLPSGD"
-    # "hpt_diabetes_RandomForest"
-    # "hpt_diabetes_DecisionTree"
-    # "hpt_diabetes_SVM"
-    # "hpt_diabetes_AdaBoost"
-    # "hpt_diabetes_MLPSGD"
+    "hpt_digits_MLPSGD"
+    "hpt_wine_RandomForest"
+    "hpt_wine_DecisionTree"
+    "hpt_wine_SVM"
+    "hpt_wine_AdaBoost"
+    "hpt_wine_MLPSGD"
+    "hpt_diabetes_RandomForest"
+    "hpt_diabetes_DecisionTree"
+    "hpt_diabetes_SVM"
+    "hpt_diabetes_AdaBoost"
+    "hpt_diabetes_MLPSGD"
 )
 
 # Function to run problems in batches
@@ -77,18 +77,18 @@ run_batch() {
     local batch=("$@")
     for problem in "${batch[@]}"; do
         echo "Starting problem: $problem"
-        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops3 --server_node h100-m-11 &
+        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops3 --server_node h100-m-12 &
     done
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 6 problems for 30 problems
+# Split into batches of 6 problems for 18 problems
 echo "Running problems in batches of 6..."
 run_batch "${problems[@]:0:6}"    # Problems 0-5
 run_batch "${problems[@]:6:6}"    # Problems 6-11
 run_batch "${problems[@]:12:6}"   # Problems 12-17
-run_batch "${problems[@]:18:6}"   # Problems 18-23
-run_batch "${problems[@]:24:6}"   # Problems 24-29
+# run_batch "${problems[@]:18:6}"   # Problems 18-23
+# run_batch "${problems[@]:24:6}"   # Problems 24-29
 # run_batch "${problems[@]:30:3}"   # Problems 30-32
 # run_batch "${problems[@]:48:3}"   # Problems 48-50
 # run_batch "${problems[@]:51:3}"   # Problems 51-53
