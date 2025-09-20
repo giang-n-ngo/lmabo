@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import json
 import os
 import sys
 import argparse
@@ -652,7 +653,9 @@ if __name__=="__main__":
         "bo_alternating_k5", 
         "bo_explore_exploit", 
         "lmabo-ops2",
-        "lmabo-ab5"
+        # "lmabo-ops3",
+        "lmabo-ops4",
+        "lmabo-ab5",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
@@ -668,8 +671,17 @@ if __name__=="__main__":
         all_problems, 
         all_methods
     )
+    # save empirical_optimum to a json file for future reference
+    with open(f"{NUMERICAL_RESULTS_DIR}/empirical_optimum_{args.setting}.json", "w") as f:
+        json.dump(empirical_optimum, f, indent=4)
     all_simple_regrets = cal_simple_regret(all_raw_results, empirical_optimum)
     agg_simple_regrets_df = aggregate_and_to_df(all_simple_regrets, "auc")
+    # save best AUC per problem to a json file for future reference
+    best_auc = {}
+    for problem in agg_simple_regrets_df["problem"].unique():
+        best_auc[problem] = agg_simple_regrets_df[agg_simple_regrets_df["problem"] == problem].iloc[:, 2:-1].min().min()
+    with open(f"{NUMERICAL_RESULTS_DIR}/best_auc_{args.setting}.json", "w") as f:
+        json.dump(best_auc, f, indent=4)
     avg_cv = calculate_coefficient_of_variation(agg_simple_regrets_df)
     rel_performance_df = get_relative_performance_and_rank(agg_simple_regrets_df, completed_problems)
     temp_summary_df = summary_by_method(rel_performance_df)

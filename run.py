@@ -12,6 +12,7 @@ from test_functions.test_function_loader import load_objective_func
 import argparse
 import numpy as np
 import os
+import time
 import torch
 from dataclasses import dataclass
 from torch.quasirandom import SobolEngine
@@ -162,9 +163,9 @@ def run_problem(
         print(f"RUN {exp_idx}")
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-        if os.path.exists(f"{folder_path}/{exp_idx}_train_X.npy"):
-            print("Completed!")
-            continue
+        # if os.path.exists(f"{folder_path}/{exp_idx}_train_X.npy"):
+        #     print("Completed!")
+        #     continue
         # Generate initial training data
         fixed_train_X, fixed_train_Y  = generate_initial_data(
             bounds, 
@@ -302,18 +303,18 @@ def run_problem(
                 bounds,
                 num_iterations
             )
-        save_results(
-            folder_path, 
-            exp_idx, 
-            train_X, 
-            train_Y,
-            simple_regret=simple_regret, 
-            cum_regret=cum_regret, 
-            acq_type_list=acq_type_list,
-            choice_list=choice_list,
-            messages=messages,
-            weights=weights
-        )
+        # save_results(
+        #     folder_path, 
+        #     exp_idx, 
+        #     train_X, 
+        #     train_Y,
+        #     simple_regret=simple_regret, 
+        #     cum_regret=cum_regret, 
+        #     acq_type_list=acq_type_list,
+        #     choice_list=choice_list,
+        #     messages=messages,
+        #     weights=weights
+        # )
         del fixed_train_X, fixed_train_Y, train_X, train_Y  # Free memory
 
 def parse_arguments():
@@ -336,7 +337,12 @@ if __name__=="__main__":
     starting_exp_idx = max(0, args.starting_exp_idx)
     if args.method == "bo":
         for acq_type in ACQ_TYPE_MAPPING.keys():
+            if acq_type in ["PI", "LogPI", "EI", "LogEI", "TS", "UCB", "PosMean", "PosSTD"]:
+                continue  # Skip PI and LogPI due to poor performance
+            start_time = time.time()
             run_problem(args.problem, acq_type, starting_exp_idx)
+            end_time = time.time()
+            print(f"Time taken for {acq_type}: {end_time - start_time}")
     else:
         run_problem(
             args.problem,
