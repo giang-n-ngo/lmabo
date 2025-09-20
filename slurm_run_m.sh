@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=lmabo-ops3-1
-#SBATCH --output=log/lmabo-ops3-1.out
-#SBATCH --error=log/lmabo-ops3-1.err
+#SBATCH --job-name=lmabo-ops3-2
+#SBATCH --output=log/lmabo-ops3-2.out
+#SBATCH --error=log/lmabo-ops3-2.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=a100:1
@@ -20,21 +20,21 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    "Ackley" 
-    "Beale" 
-    "Bukin" 
-    "Cosine8" 
-    "DixonPrice" 
-    "DropWave" 
+    # "Ackley" 
+    # "Beale" 
+    # "Bukin" 
+    # "Cosine8" 
+    # "DixonPrice" 
+    # "DropWave" 
     # "EggHolder" 
-    "Griewank" 
-    "Hartmann" 
-    "HolderTable" 
-    "Levy" 
-    "Michalewicz" 
-    "Shekel" 
-    "SixHumpCamel" 
-    "StyblinskiTang" 
+    # "Griewank" 
+    # "Hartmann" 
+    # "HolderTable" 
+    # "Levy" 
+    # "Michalewicz" 
+    # "Shekel" 
+    # "SixHumpCamel" 
+    # "StyblinskiTang" 
     "BucheRastrigin" 
     "LinearSlope" 
     "AttractiveSector" 
@@ -77,7 +77,7 @@ run_batch() {
     local batch=("$@")
     for problem in "${batch[@]}"; do
         echo "Starting problem: $problem"
-        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops3 --server_node h100-m-07 &
+        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops3 --server_node h100-m-11 &
     done
     wait  # Wait for this batch to complete
 }
@@ -85,7 +85,7 @@ run_batch() {
 # Split into batches of 12 problems for 20 problems
 echo "Running problems in batches of 12..."
 run_batch "${problems[@]:0:12}"    # Problems 0-11
-run_batch "${problems[@]:12:12}"   # Problems 12-23
+# run_batch "${problems[@]:12:12}"   # Problems 12-23
 # run_batch "${problems[@]:24:12}"   # Problems 24-35
 # run_batch "${problems[@]:30:3}"   # Problems 30-32
 # run_batch "${problems[@]:48:3}"   # Problems 48-50
