@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=qwen3-30b-3
-#SBATCH --output=log/qwen3_30b-3.out
-#SBATCH --error=log/qwen3_30b-3.err
+#SBATCH --job-name=qwen3-30b-2
+#SBATCH --output=log/qwen3_30b-2.out
+#SBATCH --error=log/qwen3_30b-2.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-large
 #SBATCH --gpus=h100:2
-#SBATCH --time=24:00:00 
+#SBATCH --time=48:00:00 
 #SBATCH --mem=120GB
 #SBATCH --cpus-per-gpu=32
 #SBATCH --qos=batch-short

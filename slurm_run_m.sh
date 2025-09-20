@@ -5,7 +5,7 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=a100:1
-#SBATCH --time=10:00:00 
+#SBATCH --time=18:00:00 
 #SBATCH --mem=48GB                    
 #SBATCH --cpus-per-gpu=48             
 #SBATCH --qos=batch-short
@@ -20,29 +20,29 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    # "Ackley" 
+    "Ackley" 
     "Beale" 
-    # "Bukin" 
-    # "Cosine8" 
-    # "DixonPrice" 
-    # "DropWave" 
+    "Bukin" 
+    "Cosine8" 
+    "DixonPrice" 
+    "DropWave" 
     # "EggHolder" 
-    # "Griewank" 
-    # "Hartmann" 
-    # "HolderTable" 
-    # "Levy" 
-    # "Michalewicz" 
-    # "Shekel" 
-    # "SixHumpCamel" 
-    # "StyblinskiTang" 
-    # "BucheRastrigin" 
-    # "LinearSlope" 
-    # "AttractiveSector" 
-    # "StepEllipsoid" 
-    # "Discus" 
-    # "BentCigar" 
-    # "SharpRidge" 
-    # "DifferentPowers" 
+    "Griewank" 
+    "Hartmann" 
+    "HolderTable" 
+    "Levy" 
+    "Michalewicz" 
+    "Shekel" 
+    "SixHumpCamel" 
+    "StyblinskiTang" 
+    "BucheRastrigin" 
+    "LinearSlope" 
+    "AttractiveSector" 
+    "StepEllipsoid" 
+    "Discus" 
+    "BentCigar" 
+    "SharpRidge" 
+    "DifferentPowers" 
     # "Weierstrass" 
     # "SchaffersIllCond" 
     # "CompositeGriewankRosenbrock" 
@@ -85,8 +85,8 @@ run_batch() {
 # Split into batches of 12 problems for 20 problems
 echo "Running problems in batches of 12..."
 run_batch "${problems[@]:0:12}"    # Problems 0-11
-# run_batch "${problems[@]:12:12}"   # Problems 12-23
-# run_batch "${problems[@]:24:6}"   # Problems 24-29
+run_batch "${problems[@]:12:12}"   # Problems 12-23
+# run_batch "${problems[@]:24:12}"   # Problems 24-35
 # run_batch "${problems[@]:30:3}"   # Problems 30-32
 # run_batch "${problems[@]:48:3}"   # Problems 48-50
 # run_batch "${problems[@]:51:3}"   # Problems 51-53
