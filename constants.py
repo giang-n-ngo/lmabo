@@ -111,6 +111,7 @@ ALGO_FILE_COUNT = {
     "setup_bo-curated": 6,
     "esp": 5,
     "esp-curated": 5,
+    "random_acq": 5,
     # "lmabo2": 7,
     "llmgp": 3,
     "llambo": 3,

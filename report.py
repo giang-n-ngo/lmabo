@@ -244,6 +244,7 @@ methods_order = [
     "qJES",
     "llambo",
     "llmgp",
+    "random_acq",
     "gphedge",
     "no_past_bo",
     "setup_bo",
@@ -259,6 +260,7 @@ methods_order_ablation = [
     # "lmabo-ab5",
     "lmabo-ops",
     # "lmabo-ops2",
+    "lmabo-ops3",
     "lmabo",
 ]
 
@@ -277,6 +279,7 @@ method_name_mapping = {
     "qJES": "JES",
     "llambo": "LLAMBO",
     "llmgp": "LLMP",
+    "random_acq": "Random AF",
     "gphedge": "GP-Hedge",
     "gphedge-curated": "GP-Hedge-Curated",
     "no_past_bo": "No-PASt-BO",
@@ -293,6 +296,7 @@ method_name_mapping = {
     # "lmabo-ab5": "LMABO-AB5",
     "lmabo-ops": "LMABO-8B",
     # "lmabo-ops2": "LMABO-14B",
+    "lmabo-ops3": "LMABO-30B",
 }
 
 def get_mean_iqr_summary(rel_performance_df):
@@ -637,6 +641,7 @@ if __name__=="__main__":
             # "lmabo-ab5",
             "lmabo-ops",
             # "lmabo-ops2",
+            "lmabo-ops3",
         ]
         all_methods = [method for method in all_methods if method not in ablation_methods]
     elif args.setting == "synthetic":
@@ -656,6 +661,7 @@ if __name__=="__main__":
         # "lmabo-ops3",
         "lmabo-ops4",
         "lmabo-ab5",
+        "random_acq",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 

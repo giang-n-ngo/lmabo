@@ -292,6 +292,15 @@ def run_problem(
                 bounds,
                 num_iterations,
             )
+        elif acq_type == "random_acq":
+            from baselines.random_acq import random_acq_full_loop
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list = random_acq_full_loop(
+                objective_func,
+                af_portfolio,
+                fixed_train_X, fixed_train_Y,
+                bounds,
+                num_iterations,
+            )
         else:
             from baselines.bo import bo_full_loop
             # run fixed acq_type
