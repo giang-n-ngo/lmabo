@@ -128,14 +128,14 @@ def _prepare_acquisition_function(acq_type, bounds, best_f, gp):
         raise ValueError("Invalid acquisition function type")    
     return acq_func
 
-def _optimize_acqf(acq_type, acq_func, bounds, cheap=False):
+def _optimize_acqf(acq_type, acq_func, bounds):
     if acq_type == "TS":
-        n_candidates = min(5000, max(2000, 200 * bounds.size(1))) if not cheap else 50
+        n_candidates = min(5000, max(2000, 200 * bounds.size(1)))
         sobol = SobolEngine(bounds.size(1), scramble=True)
         X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(n_candidates).to(dtype=dtype, device=device)
         candidate = acq_func(X_cand, num_samples=1)
     elif acq_type == "qPES":
-        n_candidates = min(1000, max(1000, 200 * bounds.size(1))) if not cheap else 50
+        n_candidates = min(1000, max(1000, 200 * bounds.size(1)))
         sobol = SobolEngine(bounds.size(1), scramble=True)
         X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(n_candidates).to(dtype=dtype, device=device)
         acq_val = acq_func(X_cand)
@@ -145,8 +145,8 @@ def _optimize_acqf(acq_type, acq_func, bounds, cheap=False):
             "acq_function": acq_func,
             "bounds": bounds,
             "q": 1,
-            "num_restarts": 10 if not cheap else 1,
-            "raw_samples": 512 if not cheap else 16
+            "num_restarts": 10,
+            "raw_samples": 512
         }
         candidate, _ = optimize_acqf(**optimize_acqf_kwargs)
     return candidate

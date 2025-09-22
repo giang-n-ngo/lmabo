@@ -1,6 +1,5 @@
 import torch
 import numpy as np
-from botorch.optim import optimize_acqf
 from botorch.generation.sampling import MaxPosteriorSampling
 from torch.quasirandom import SobolEngine
 
@@ -56,7 +55,7 @@ class EntropySearchPortfolio:
         ts_sampler = create_minimized_acquisition_function(MaxPosteriorSampling, self.model)
         for _ in range(self.G):
             sobol = SobolEngine(bounds.size(1), scramble=True)
-            X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(20).to(dtype=DTYPE, device=DEVICE)
+            X_cand = bounds[0] + (bounds[1] - bounds[0]) * sobol.draw(100).to(dtype=DTYPE, device=DEVICE)
             representer = ts_sampler(X_cand)
             representers.append(representer)
             del sobol, X_cand
@@ -170,9 +169,9 @@ def esp_full_loop(
         esp_meta_policy = EntropySearchPortfolio(
             model=gp,
             candidates=candidates,
-            num_representer_points=10,
+            num_representer_points=50,
             num_hallucinated_observations=10,
-            num_fantasized_samples=10
+            num_fantasized_samples=100
         )
         
         next_point, idx = esp_meta_policy.evaluate(bounds=bounds)

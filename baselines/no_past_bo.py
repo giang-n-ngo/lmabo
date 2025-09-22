@@ -1,5 +1,4 @@
 import torch
-import math
 import numpy as np
 
 from baselines.bo_helpers import (
