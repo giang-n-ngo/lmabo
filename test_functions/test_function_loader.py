@@ -3,23 +3,17 @@ from test_functions.coco_test_functions import Easom, create_coco_class
 from test_functions.hpt_test_functions import create_bayesmark_class
 
 COCO_DICT = {
-    "Sphere": {"function_id": 1, "dimension": 5},
-    "Ellipsoid": {"function_id": 2, "dimension": 5},
     "BucheRastrigin": {"function_id": 4, "dimension": 5},
     "LinearSlope": {"function_id": 5, "dimension": 5},
     "AttractiveSector": {"function_id": 6, "dimension": 5},
     "StepEllipsoid": {"function_id": 7, "dimension": 5},
-    "RosenbrockRotated": {"function_id": 9, "dimension": 10},
-    "Ellipsoid2": {"function_id": 10, "dimension": 10},
     "Discus": {"function_id": 11, "dimension": 5},
     "BentCigar": {"function_id": 12, "dimension": 5},
     "SharpRidge": {"function_id": 13, "dimension": 5},
     "DifferentPowers": {"function_id": 14, "dimension": 5},
     "Weierstrass": {"function_id": 16, "dimension": 5},
-    "Schaffers": {"function_id": 17, "dimension": 5},
     "SchaffersIllCond": {"function_id": 18, "dimension": 5},
     "CompositeGriewankRosenbrock": {"function_id": 19, "dimension": 10},
-    "Schwefel": {"function_id": 20, "dimension": 5},
     "Gallagher21": {"function_id": 21, "dimension": 5},
     "Gallagher101": {"function_id": 22, "dimension": 5},
     "Katsuura": {"function_id": 23, "dimension": 5},
@@ -33,9 +27,6 @@ DIMS = {
     "Hartmann": 6,
     "Levy": 13,
     "Michalewicz": 10,
-    "Powell": 18,
-    "Rosenbrock": 24,
-    "Rastrigin": 23,
     "StyblinskiTang": 21,
 }
 

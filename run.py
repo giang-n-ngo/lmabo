@@ -207,24 +207,6 @@ def run_problem(
             # optimize and get results
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
             del LMABO  # Free memory
-        # elif acq_type in ["lmabo2", "lmabo2-ops"]:
-        #     from lmabo import LanguageModelAssistedAdaptiveBO2
-        #     if acq_type == "lmabo2":
-        #         llm = "api"
-        #     elif acq_type == "lmabo2-ops":
-        #         llm = "ops"
-        #     LMABO2 = LanguageModelAssistedAdaptiveBO2(                
-        #         objective_func, 
-        #         fixed_train_X, 
-        #         fixed_train_Y, 
-        #         bounds, 
-        #         num_iterations,
-        #         llm,
-        #         server_node,
-        #     )
-        #     # optimize and get results
-        #     simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
-        #     del LMABO2  # Free memory
         elif acq_type in ["gphedge", "gphedge-curated"]:
             from baselines.gp_hedge import gp_hedge_full_loop
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = gp_hedge_full_loop(
@@ -289,15 +271,6 @@ def run_problem(
                 objective_func,
                 fixed_train_X,
                 fixed_train_Y,
-                bounds,
-                num_iterations,
-            )
-        elif acq_type == "random_acq":
-            from baselines.random_acq import random_acq_full_loop
-            simple_regret, cum_regret, train_X, train_Y, acq_type_list = random_acq_full_loop(
-                objective_func,
-                af_portfolio,
-                fixed_train_X, fixed_train_Y,
                 bounds,
                 num_iterations,
             )

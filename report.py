@@ -7,10 +7,6 @@ import argparse
 from scipy import stats
 from statsmodels.stats.multitest import multipletests
 
-from utils import (
-    report_completion,
-)
-
 from constants import (
     ACQ_TYPE_MAPPING,
     ALGO_FILE_COUNT,
@@ -21,10 +17,10 @@ from constants import (
 
 final_problems = [
     # botorch
-    "Ackley", # must have
+    "Ackley", 
     "Beale",
     "Bukin",
-    "Cosine8", # must have
+    "Cosine8", 
     "DixonPrice",
     "DropWave",
     "EggHolder",
@@ -49,7 +45,7 @@ final_problems = [
     "SchaffersIllCond",
     "CompositeGriewankRosenbrock",
     "Gallagher21",
-    "Gallagher101", # must have
+    "Gallagher101", 
     "Katsuura",
     "LunacekBiRastrigin",
     # hpSV
@@ -58,7 +54,7 @@ final_problems = [
     "hpt_breast_SVM",
     "hpt_breast_AdaBoost",
     "hpt_breast_MLPSGD",
-    "hpt_digits_RandomForest", # must have
+    "hpt_digits_RandomForest", 
     "hpt_digits_DecisionTree",
     "hpt_digits_SVM",
     "hpt_digits_AdaBoost",
@@ -86,6 +82,70 @@ methods_order_curated = [
     "esp-curated",
 ]
 
+methods_order = [
+    "PosSTD",
+    "PosMean",
+    "PI", 
+    "LogPI",
+    "EI",
+    "LogEI",
+    "UCB",
+    "TS",
+    "qKG",
+    "qPES",
+    "qMES",
+    "qJES",
+    "llambo",
+    "llmgp",
+    "gphedge",
+    "no_past_bo",
+    "setup_bo",
+    "esp",
+    "lmabo",
+]
+
+methods_order_ablation = [
+    "lmabo-ab1",
+    "lmabo-ab2",
+    "lmabo-ab3",
+    "lmabo-ab4",
+    "lmabo-ops",
+    "lmabo-ops3",
+    "lmabo",
+]
+
+method_name_mapping = {
+    "PosSTD": "PosSTD",
+    "PosMean": "PosMean",
+    "PI": "PI", 
+    "LogPI": "LogPI",
+    "EI": "EI",
+    "LogEI": "LogEI",
+    "UCB": "UCB",
+    "TS": "TS",
+    "qKG": "KG",
+    "qPES": "PES",
+    "qMES": "MES",
+    "qJES": "JES",
+    "llambo": "LLAMBO",
+    "llmgp": "LLMP",
+    "gphedge": "GP-Hedge",
+    "gphedge-curated": "GP-Hedge-Curated",
+    "no_past_bo": "No-PASt-BO",
+    "no_past_bo-curated": "No-PASt-BO-Curated",
+    "setup_bo": "SETUP-BO",
+    "setup_bo-curated": "SETUP-BO-Curated",
+    "esp": "ESP",
+    "esp-curated": "ESP-Curated",
+    "lmabo": "LMABO",
+    "lmabo-ab1": "LMABO-AB1",
+    "lmabo-ab2": "LMABO-AB2",
+    "lmabo-ab3": "LMABO-AB3",
+    "lmabo-ab4": "LMABO-AB4",
+    "lmabo-ops": "LMABO-8B",
+    "lmabo-ops3": "LMABO-30B",
+}
+
 def read_raw_result(problem, acq_type, result_type):
     raw_result = []
     for exp_idx in range(EXP_RUNS):
@@ -107,6 +167,58 @@ def read_raw_result(problem, acq_type, result_type):
         except FileNotFoundError:
             continue 
     return raw_result
+
+def report_completion(
+    problems, 
+    active_acq_type_list=list(ACQ_TYPE_MAPPING.keys()), 
+    excepted_acq_type_list=[]
+):
+    """
+    Print a table showing number of completed runs for each problem and acquisition type.
+    """
+    print("Checking number of completed runs for each problem and acquisition type...")
+    completed_problems = []
+    
+    # Calculate padding for pretty printing
+    problem_width = max(len(str(p)) for p in problems)
+    acq_width = max(len(str(a)) for a in active_acq_type_list + excepted_acq_type_list)
+    
+    # Print header
+    header = f"{'Problem':<{problem_width}}|"
+    header += "".join(f"{acq:^{acq_width}}|" for acq in active_acq_type_list + excepted_acq_type_list)
+    print("-" * len(header))
+    print(header)
+    print("-" * len(header))
+    
+    # Print each problem's row and check completion
+    for problem in problems:
+        row = f"{problem:<{problem_width}}|"
+        problem_complete = True
+        
+        for acq in active_acq_type_list + excepted_acq_type_list:
+            if acq == "llmgp":
+                folder_path = f"{LLMGP_NUMERICAL_RESULTS_DIR}/{problem}/llmgp"
+            else:
+                folder_path = f"{NUMERICAL_RESULTS_DIR}/{problem}/{acq}"
+            if not os.path.exists(folder_path):
+                count = 0
+            else:
+                count = len([f for f in os.listdir(folder_path)])
+                if acq in ALGO_FILE_COUNT.keys():
+                    count = int(count//ALGO_FILE_COUNT[acq])
+                else:
+                   count = int(count//4)
+            row += f"{count:^{acq_width}}|"
+            if count < EXP_RUNS and acq not in excepted_acq_type_list:
+                problem_complete = False
+                
+        print(row)
+        if problem_complete:
+            completed_problems.append(problem)
+            
+    print("-" * len(header))
+    print("Completed: ", completed_problems)
+    return completed_problems
 
 def get_agg_result(raw_result, agg):
     if agg == "auc":
@@ -229,76 +341,6 @@ def rank_methods_by_problem(rel_performance_df, problem):
     # print full df without new line
     print(ranked_df.to_string(index=False))
 
-methods_order = [
-    "PosSTD",
-    "PosMean",
-    "PI", 
-    "LogPI",
-    "EI",
-    "LogEI",
-    "UCB",
-    "TS",
-    "qKG",
-    "qPES",
-    "qMES",
-    "qJES",
-    "llambo",
-    "llmgp",
-    "random_acq",
-    "gphedge",
-    "no_past_bo",
-    "setup_bo",
-    "esp",
-    "lmabo",
-]
-
-methods_order_ablation = [
-    "lmabo-ab1",
-    "lmabo-ab2",
-    "lmabo-ab3",
-    "lmabo-ab4",
-    # "lmabo-ab5",
-    "lmabo-ops",
-    # "lmabo-ops2",
-    "lmabo-ops3",
-    "lmabo",
-]
-
-method_name_mapping = {
-    "PosSTD": "PosSTD",
-    "PosMean": "PosMean",
-    "PI": "PI", 
-    "LogPI": "LogPI",
-    "EI": "EI",
-    "LogEI": "LogEI",
-    "UCB": "UCB",
-    "TS": "TS",
-    "qKG": "KG",
-    "qPES": "PES",
-    "qMES": "MES",
-    "qJES": "JES",
-    "llambo": "LLAMBO",
-    "llmgp": "LLMP",
-    "random_acq": "Random AF",
-    "gphedge": "GP-Hedge",
-    "gphedge-curated": "GP-Hedge-Curated",
-    "no_past_bo": "No-PASt-BO",
-    "no_past_bo-curated": "No-PASt-BO-Curated",
-    "setup_bo": "SETUP-BO",
-    "setup_bo-curated": "SETUP-BO-Curated",
-    "esp": "ESP",
-    "esp-curated": "ESP-Curated",
-    "lmabo": "LMABO",
-    "lmabo-ab1": "LMABO-AB1",
-    "lmabo-ab2": "LMABO-AB2",
-    "lmabo-ab3": "LMABO-AB3",
-    "lmabo-ab4": "LMABO-AB4",
-    # "lmabo-ab5": "LMABO-AB5",
-    "lmabo-ops": "LMABO-8B",
-    # "lmabo-ops2": "LMABO-14B",
-    "lmabo-ops3": "LMABO-30B",
-}
-
 def get_mean_iqr_summary(rel_performance_df):
     # rel_performance_df: columns: method, problem, relative_performance, problem_rank
 
@@ -348,10 +390,6 @@ def summary_to_latex(
     \begin{table}
     \caption{
         \textbf{Overall performance comparison of LMABO against all baselines across 60 optimization problems}. 
-        The p-values from the Friedman test in the last row indicate statistically significant differences among methods for both RP and rank.
-        The p-values from the one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction are shown next to the reported metric value of each method.
-        It should be noted that both RP and rank include ablation methods (which is why the maximum rank is 23 instead of 19).
-        Separate results for the ablation methods are provided in Table \ref{tab:ablation}.
     }
     \label{tab:aggregated}
     \centering
@@ -415,9 +453,6 @@ def ablation_summary_to_latex(
     \begin{table}
     \caption{
         \textbf{Ablation study on the components of LMABO}. 
-        We analyze the contribution of LMABO's key components by comparing the full model to four ablated versions: LMABO-AB1, LMABO-AB2, and LMABO-AB3, which remove the remaining budget, GP model characteristics, and shortest distance information, respectively; and LMABO-OPS, which uses a smaller language model (Qwen3-8B). 
-        The Mean RP and Mean Rank are calculated using the same global ranking of all baseline and ablation methods as in Table \ref{tab:aggregated}. 
-        The p-values from a one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction compare each ablated model against the full LMABO.
     }
     \label{tab:ablation}
     \centering
@@ -525,7 +560,7 @@ def curated_summary_to_latex(
 
 def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, control_method="lmabo"):
     """
-    Perform Friedman omnibus and pairwise Wilcoxon tests on:
+    Perform Friedman and pairwise Wilcoxon tests on:
       - relative_performance (numeric)
       - problem_rank (ranks)
     Returns dictionaries of Holm-corrected p-values for pairwise comparisons (control vs others),
@@ -613,7 +648,7 @@ if __name__=="__main__":
         "--setting",
         type=str,
         default="full",
-        choices=["full", "hd", "synthetic", "real"],
+        choices=["full", "synthetic", "real"],
         help="Summary setting: full problem lists or something else",
     )
     args = parser.parse_args()
@@ -624,26 +659,6 @@ if __name__=="__main__":
     # all_problems = OBJECTIVE_FUNCTIONS_NAMES
     if args.setting == "full":
         all_problems = final_problems
-    elif args.setting == "hd":
-        # high-dimensional problems only
-        all_problems = [
-            "Ackley",
-            "Rosenbrock",
-            "Rastrigin",
-            "StyblinskiTang",
-        ]
-        # remove ablation methods from all_methods
-        ablation_methods = [
-            "lmabo-ab1",
-            "lmabo-ab2",
-            "lmabo-ab3",
-            "lmabo-ab4",
-            # "lmabo-ab5",
-            "lmabo-ops",
-            # "lmabo-ops2",
-            "lmabo-ops3",
-        ]
-        all_methods = [method for method in all_methods if method not in ablation_methods]
     elif args.setting == "synthetic":
         from constants import BOTORCH_FUNCTIONS_NAMES, COCO_FUNCTIONS_NAMES
         # find the ones in final_problems and in botorch or coco
@@ -651,17 +666,12 @@ if __name__=="__main__":
     elif args.setting == "real":
         from constants import HPT_FUNCTIONS_NAMES
         all_problems = [p for p in final_problems if p in HPT_FUNCTIONS_NAMES]
-    # exclude some methods during the main report
+    # exclude some methods in the main table
     excluded_methods = [
         "bo_alternating_k1", 
         "bo_alternating_k3", 
         "bo_alternating_k5", 
         "bo_explore_exploit", 
-        "lmabo-ops2",
-        # "lmabo-ops3",
-        "lmabo-ops4",
-        "lmabo-ab5",
-        "random_acq",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
 
