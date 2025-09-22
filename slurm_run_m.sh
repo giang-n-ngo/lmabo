@@ -3,11 +3,11 @@
 #SBATCH --output=log/lmabo-ops3-2.out
 #SBATCH --error=log/lmabo-ops3-2.err
 #SBATCH --nodes=1
-#SBATCH --partition=gpu
-#SBATCH --gpus=a100:1
-#SBATCH --time=10:00:00 
-#SBATCH --mem=48GB                    
-#SBATCH --cpus-per-gpu=48             
+#SBATCH --partition=gpu-large
+#SBATCH --gpus=1
+#SBATCH --time=7:00:00 
+#SBATCH --mem=28GB                    
+#SBATCH --cpus-per-gpu=28             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -19,7 +19,7 @@ conda activate lmabo
 
 CUDA_LAUNCH_BLOCKING=1
 
-problems=(
+# problems=(
     # "Ackley" 
     # "Beale" 
     # "Bukin" 
@@ -60,16 +60,32 @@ problems=(
     # "hpt_digits_SVM"
     # "hpt_digits_AdaBoost"
     # "hpt_digits_MLPSGD"
-    "hpt_wine_RandomForest"
-    "hpt_wine_DecisionTree"
+    # "hpt_wine_RandomForest"
+    # "hpt_wine_DecisionTree"
     # "hpt_wine_SVM"
     # "hpt_wine_AdaBoost"
     # "hpt_wine_MLPSGD"
-    "hpt_diabetes_RandomForest"
+    # "hpt_diabetes_RandomForest"
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
     # "hpt_diabetes_AdaBoost"
     # "hpt_diabetes_MLPSGD"
+# )
+problems=(
+    # "Beale"
+    # "Bukin"
+    # "StepEllipsoid"
+    # "Levy"
+    # "Discus"
+    # "hpt_breast_SVM"
+    # "hpt_digits_AdaBoost"
+    # "SixHumpCamel"
+    # "AttractiveSector"
+    # "Gallagher21"
+    "hpt_digits_DecisionTree"
+    "hpt_digits_MLPSGD"
+    "DixonPrice"
+    "BentCigar"
 )
 
 # Function to run problems in batches
@@ -84,8 +100,8 @@ run_batch() {
 
 # Split into batches of 12 problems for 20 problems
 echo "Running problems in batches of 12..."
-run_batch "${problems[@]:0:3}"    # Problems 0-3
-# run_batch "${problems[@]:8:6}"   # Problems 8-13
+run_batch "${problems[@]:0:7}"    # Problems 0-6
+# run_batch "${problems[@]:7:7}"   # Problems 7-13
 # run_batch "${problems[@]:14:12}"   # Problems 14-25
 # run_batch "${problems[@]:30:3}"   # Problems 30-32
 # run_batch "${problems[@]:48:3}"   # Problems 48-50
