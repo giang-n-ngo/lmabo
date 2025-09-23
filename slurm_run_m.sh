@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=lmabo-ops3-2
-#SBATCH --output=log/lmabo-ops3-2.out
-#SBATCH --error=log/lmabo-ops3-2.err
+#SBATCH --job-name=lmabo-ops3-1
+#SBATCH --output=log/lmabo-ops3-1.out
+#SBATCH --error=log/lmabo-ops3-1.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-large
 #SBATCH --gpus=1
-#SBATCH --time=7:00:00 
+#SBATCH --time=4:00:00 
 #SBATCH --mem=28GB                    
 #SBATCH --cpus-per-gpu=28             
 #SBATCH --qos=batch-short
@@ -82,10 +82,10 @@ problems=(
     # "SixHumpCamel"
     # "AttractiveSector"
     # "Gallagher21"
-    "hpt_digits_DecisionTree"
-    "hpt_digits_MLPSGD"
+    # "hpt_digits_DecisionTree"
+    # "hpt_digits_MLPSGD"
     "DixonPrice"
-    "BentCigar"
+    # "BentCigar"
 )
 
 # Function to run problems in batches
@@ -100,9 +100,9 @@ run_batch() {
 
 # Split into batches of 12 problems for 20 problems
 echo "Running problems in batches of 12..."
-run_batch "${problems[@]:0:7}"    # Problems 0-6
-# run_batch "${problems[@]:7:7}"   # Problems 7-13
-# run_batch "${problems[@]:14:12}"   # Problems 14-25
+run_batch "${problems[@]:0:5}"    # Problems 0-5
+# run_batch "${problems[@]:6:7}"   # Problems 6-12
+# run_batch "${problems[@]:13:12}"   # Problems 13-24
 # run_batch "${problems[@]:30:3}"   # Problems 30-32
 # run_batch "${problems[@]:48:3}"   # Problems 48-50
 # run_batch "${problems[@]:51:3}"   # Problems 51-53
