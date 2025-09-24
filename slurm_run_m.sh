@@ -6,8 +6,8 @@
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
 #SBATCH --time=6:00:00 
-#SBATCH --mem=30GB                    
-#SBATCH --cpus-per-gpu=20             
+#SBATCH --mem=20GB                    
+#SBATCH --cpus-per-gpu=16             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -85,7 +85,7 @@ run_batch() {
     local batch=("$@")
     for problem in "${batch[@]}"; do
         echo "Starting problem: $problem"
-        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops3 --server_node h100-m-11 &
+        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops3 --server_node a100-m-02 &
     done
     wait  # Wait for this batch to complete
 }
