@@ -3,11 +3,11 @@
 #SBATCH --output=log/lmabo-ops3-1.out
 #SBATCH --error=log/lmabo-ops3-1.err
 #SBATCH --nodes=1
-#SBATCH --partition=gpu-large
+#SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=4:00:00 
-#SBATCH --mem=28GB                    
-#SBATCH --cpus-per-gpu=28             
+#SBATCH --time=6:00:00 
+#SBATCH --mem=30GB                    
+#SBATCH --cpus-per-gpu=20             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -72,20 +72,12 @@ CUDA_LAUNCH_BLOCKING=1
     # "hpt_diabetes_MLPSGD"
 # )
 problems=(
-    # "Beale"
-    # "Bukin"
-    # "StepEllipsoid"
+    "DixonPrice"
     # "Levy"
-    # "Discus"
-    # "hpt_breast_SVM"
-    # "hpt_digits_AdaBoost"
     # "SixHumpCamel"
     # "AttractiveSector"
-    # "Gallagher21"
-    # "hpt_digits_DecisionTree"
+    # "hpt_digits_AdaBoost"
     # "hpt_digits_MLPSGD"
-    "DixonPrice"
-    # "BentCigar"
 )
 
 # Function to run problems in batches
@@ -100,7 +92,7 @@ run_batch() {
 
 # Split into batches of 12 problems for 20 problems
 echo "Running problems in batches of 12..."
-run_batch "${problems[@]:0:5}"    # Problems 0-5
+run_batch "${problems[@]:0:1}"    # Problems 0-5
 # run_batch "${problems[@]:6:7}"   # Problems 6-12
 # run_batch "${problems[@]:13:12}"   # Problems 13-24
 # run_batch "${problems[@]:30:3}"   # Problems 30-32
