@@ -261,7 +261,9 @@ methods_order_ablation = [
     "lmabo-ops",
     # "lmabo-ops2",
     "lmabo-ops3",
+    "lmabo-ops6",
     "lmabo",
+    "lmabo-gpt",
 ]
 
 method_name_mapping = {
@@ -289,6 +291,7 @@ method_name_mapping = {
     "esp": "ESP",
     "esp-curated": "ESP-Curated",
     "lmabo": "LMABO",
+    "lmabo-gpt": "LMABO-GPT",
     "lmabo-ab1": "LMABO-AB1",
     "lmabo-ab2": "LMABO-AB2",
     "lmabo-ab3": "LMABO-AB3",
@@ -297,6 +300,7 @@ method_name_mapping = {
     "lmabo-ops": "LMABO-8B",
     # "lmabo-ops2": "LMABO-14B",
     "lmabo-ops3": "LMABO-30B",
+    "lmabo-ops6": "LMABO-120B",
 }
 
 def get_mean_iqr_summary(rel_performance_df):
@@ -642,6 +646,7 @@ if __name__=="__main__":
             "lmabo-ops",
             # "lmabo-ops2",
             "lmabo-ops3",
+            "lmabo-ops6",
         ]
         all_methods = [method for method in all_methods if method not in ablation_methods]
     elif args.setting == "synthetic":
@@ -653,18 +658,9 @@ if __name__=="__main__":
         all_problems = [p for p in final_problems if p in HPT_FUNCTIONS_NAMES]
     # exclude some methods during the main report
     excluded_methods = [
-        "bo_alternating_k1", 
-        "bo_alternating_k3", 
-        "bo_alternating_k5", 
-        "bo_explore_exploit", 
-        "lmabo-ops2",
-        # "lmabo-ops3",
-        "lmabo-ops4",
-        "lmabo-ab5",
         "random_acq",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
-
     # Redirect output to file
     problems = []
     for item in all_problems:
@@ -728,10 +724,11 @@ if __name__=="__main__":
         pairwise_p_rank = pairwise_df["p_rank_holm"].to_dict()
 
         # regenerate LaTeX table including p-values
+        summary_root = "summary"
         summary_to_latex(
             summary_df,
             avg_cv,
-            filename=f"summary_{args.setting}.tex",
+            filename=f"{summary_root}/{args.setting}.tex",
             pairwise_p_rel=pairwise_p_rel,
             pairwise_p_rank=pairwise_p_rank,
         )
@@ -740,7 +737,7 @@ if __name__=="__main__":
             ablation_summary_to_latex(
                 summary_df,
                 avg_cv,
-                filename="summary_ablation.tex",
+                filename=f"{summary_root}/ablation.tex",
                 pairwise_p_rel=pairwise_p_rel,
                 pairwise_p_rank=pairwise_p_rank,
             )
@@ -748,7 +745,7 @@ if __name__=="__main__":
             curated_summary_to_latex(
                 summary_df,
                 avg_cv,
-                filename="summary_curated.tex",
+                filename=f"{summary_root}/curated.tex",
                 pairwise_p_rel=pairwise_p_rel,
                 pairwise_p_rank=pairwise_p_rank,
             )

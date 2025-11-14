@@ -1,11 +1,12 @@
 import random
 import re
 import time
+from urllib import response
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 from google.generativeai.types import generation_types
 
-from key import API_KEYS
+from key import GEMINI_API_KEYS, OPENAI_API_KEY
 
 def check_available_model():
     # List all available models
@@ -44,7 +45,8 @@ def get_valid_key():
     Returns:
         list: List of valid API keys
     """
-    shuffled_keys = API_KEYS.copy()  # Create a copy to avoid modifying original
+
+    shuffled_keys = GEMINI_API_KEYS.copy()  # Create a copy to avoid modifying original
     random.shuffle(shuffled_keys)
     valid_key = None
     for key in shuffled_keys:
@@ -58,7 +60,7 @@ def get_valid_key():
         print(f"Using valid key: {valid_key[:8]}...")
         return valid_key
 
-def configure_and_start_chat_api(first_prompt):
+def start_chat_gemini(first_prompt):
     valid_key = get_valid_key()
     genai.configure(api_key=valid_key)
     # init LLM
@@ -79,60 +81,63 @@ def configure_and_start_chat_api(first_prompt):
     except Exception as e:
         print(f"Error starting chat or initial acknowledgement: {e}")
         print("Please check your API key, model availability, and network connection.")
-        exit() # Exit if we can't even start the chat    
+        exit() # Exit if we can't even start the chat
+    
+def start_chat_gpt(first_prompt):
+    from openai import OpenAI
+    openai_api_key = OPENAI_API_KEY[0]
+    openai_api_base = "https://api.openai.com/v1"
 
-class QwenChatbot:
-    def __init__(self, model_name, hosted=False, server_node="localhost"):
-        """
-        Initialize the chatbot with vLLM.
-        
-        Args:
-            model_name: Hugging Face model name/path
-        """
-        self.hosted = hosted
-        self.max_tokens = 8192  # Increased from 4096 to leave more room for context
-        self.top_p = 0.9  # Nucleus sampling probability
+    client = OpenAI(
+        api_key=openai_api_key,
+        base_url=openai_api_base,
+    )
+    print("Starting GPT chat session with initial context...")
+    try:
+        conversation_id = "we_use_llm_to_adaptively_select_acq_function"
+        response = client.responses.create(
+            model="gpt-4o-mini",
+            conversation_id=conversation_id,
+            input=first_prompt,
+        )
+        initial_response = response.output_text.strip()
+        print(f"GPT's initial acknowledgement: {initial_response}")
+        return client, initial_response, conversation_id
+    except Exception as e:
+        print(f"Error starting chat or initial acknowledgement: {e}")
+        print("Please check your API key, model availability, and network connection.")
+        exit() # Exit if we can't even start the chat
+
+def configure_and_start_chat_api(first_prompt, api_type="gemini"):
+    if api_type == "gemini":
+        chat, initial_response = start_chat_gemini(first_prompt)
+        conversation_id = None
+    elif api_type == "gpt":
+        chat, initial_response, conversation_id = start_chat_gpt(first_prompt)
+    else:
+        raise ValueError(f"Unsupported api_type: {api_type}")
+    print(f"Initialized {api_type} model")
+    # Start a conversation
+    return chat, initial_response, conversation_id
+
+class Chatbot:
+    """Base class for chatbots."""
+    def __init__(self, model_name, system_prompt, server_node="localhost"):
+        self.max_tokens = 8192  
+        self.top_p = 0.9 
         self.model_name = model_name
         print(f"Loading model: {self.model_name}")
-        if hosted:
-            from openai import OpenAI
-            openai_api_key = "EMPTY"
-            openai_api_base = f"http://{server_node}:8000/v1"
+        self.system_prompt = system_prompt
+        from openai import OpenAI
+        openai_api_key = "EMPTY"
+        openai_api_base = f"http://{server_node}:8000/v1"
 
-            self.client = OpenAI(
-                api_key=openai_api_key,
-                base_url=openai_api_base,
-            )
-            print(f"Using hosted vLLM API at {server_node}:8000")
-        else:
-            from vllm import LLM, SamplingParams
-            # Initialize vLLM with optimized settings
-            self.llm = LLM(
-                model=self.model_name,
-                gpu_memory_utilization=0.3,  # Use 80% of GPU memory
-                max_model_len=16384,         # Maximum sequence length
-                dtype="float16",             # Use half precision for efficiency
-                trust_remote_code=True,      # Required for some models
-                tensor_parallel_size=1,      # Number of GPUs (set to 1 for single GPU)
-            )
-            
-            # Sampling parameters for generation
-            self.sampling_params = SamplingParams(
-                temperature=0.0,             # Controls randomness (0.0 = deterministic)
-                top_p=self.top_p,                   # Nucleus sampling
-                max_tokens=self.max_tokens,              # Maximum tokens to generate
-                repetition_penalty=1.1,      # Reduce repetition
-            )
-            
-            # Get tokenizer for special tokens
-            self.tokenizer = self.llm.get_tokenizer()
-            
-            # Update sampling params with proper stop tokens
-            self.sampling_params.stop_token_ids = [
-                self.tokenizer.eos_token_id,
-                self.tokenizer.convert_tokens_to_ids("<|im_end|>")  # Qwen's chat end token
-            ]
-        
+        self.client = OpenAI(
+            api_key=openai_api_key,
+            base_url=openai_api_base,
+        )
+        print(f"Using hosted vLLM API at {server_node}:8000")
+
         # Conversation history
         self.history = []
         
@@ -151,19 +156,18 @@ class QwenChatbot:
         # Add the new user message to history
         self.history.append({"role": "user", "content": user_message})
         
-        # Build the chat prompt using Qwen's format
-        prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
+        prompt = self.system_prompt + "\n"
         
         for message in self.history:
             role = message["role"]
             content = message["content"]
-            prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+            prompt += f"<|im_start|>{role}<|im_sep|>\n{content}<|im_end|>\n"
         
         # Add assistant start token
-        prompt += "<|im_start|>assistant\n"
+        prompt += "<|im_start|>assistant<|im_sep|>\n"
         
         return prompt
-
+    
     def _clean_response(self, response_text):
         """
         Clean the generated response by removing unwanted tokens and formatting.
@@ -210,8 +214,8 @@ class QwenChatbot:
         print(f"Warning: Prompt too long ({len(prompt)} chars), trimming conversation history...")
         
         # Keep system prompt and recent messages
-        system_part = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n"
-        assistant_start = "<|im_start|>assistant\n"
+        system_part = self.system_prompt + "\n"
+        assistant_start = "<|im_start|>assistant<|im_sep|>\n"
         
         # Remove older messages from history until prompt fits
         while len(prompt) > available_chars and len(self.history) > 2:
@@ -224,7 +228,7 @@ class QwenChatbot:
             for message in self.history:
                 role = message["role"]
                 content = message["content"]
-                prompt += f"<|im_start|>{role}\n{content}<|im_end|>\n"
+                prompt += f"<|im_start|>{role}<|im_sep|>\n{content}<|im_end|>\n"
             prompt += assistant_start
         
         print(f"Trimmed prompt to {len(prompt)} characters with {len(self.history)} messages in history")
@@ -246,27 +250,22 @@ class QwenChatbot:
             
             # Manage context length to prevent overflow
             prompt = self._manage_context_length(prompt)
-            if self.hosted:
-                # call the client API for hosted models
-                outputs = self.client.chat.completions.create(
-                    model=self.model_name,
-                    messages=[
-                        {"role": "user", "content": prompt}
-                    ],
-                    max_tokens=self.max_tokens,
-                    temperature=0.0,
-                    top_p=self.top_p,
-                    extra_body={
-                        "top_k": 20,
-                    },
-                )
-                response = outputs.choices[0].message.content
-                if "</think>" in response:
-                    response = response.split("</think>")[1].strip()
-            else:
-                # Generate response using vLLM
-                outputs = self.llm.generate([prompt], self.sampling_params)
-                response = outputs[0].outputs[0].text
+            # call the client API for hosted models
+            outputs = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=self.max_tokens,
+                temperature=0.0,
+                top_p=self.top_p,
+                extra_body={
+                    "top_k": 20,
+                },
+            )
+            response = outputs.choices[0].message.content
+            if "</think>" in response:
+                response = response.split("</think>")[1].strip()
             
             # Clean the response
             cleaned_response = self._clean_response(response)
@@ -277,13 +276,9 @@ class QwenChatbot:
             return cleaned_response
             
         except Exception as e:
-            print(f"Full error details: {type(e).__name__}: {e}")
-            if self.hosted:
-                print("Hosted mode connection failed. Check if vLLM server is running on localhost:8000")
-            else:
-                print("Local vLLM generation failed. Check GPU availability and memory.")
-            exit()
-    
+            raise e
+            exit()    
+
     def reset_conversation(self):
         """Reset the conversation history."""
         self.history = []
@@ -293,9 +288,49 @@ class QwenChatbot:
         """Get the current conversation history."""
         return self.history.copy()
 
+class QwenChatbot(Chatbot):
+    def __init__(self, model_name, server_node="localhost"):
+        """
+        Initialize the chatbot with vLLM.
+        
+        Args:
+            model_name: Hugging Face model name/path
+        """
+        system_prompt = "<|im_start|>system\nYou are a helpful assistant.<|im_end|>"
+        super().__init__(model_name, system_prompt, server_node)
+
+class Phi4ReasoningChatbot(Chatbot):
+    def __init__(self, model_name="Phi-4-reasoning", server_node="localhost"):
+        """
+        Initialize the chatbot with vLLM.
+        
+        Args:
+            model_name: Hugging Face model name/path
+        """
+        system_prompt = "You are Phi, a language model trained by Microsoft to help users. Your role as an assistant involves thoroughly exploring questions through a systematic thinking process before providing the final precise and accurate solutions. This requires engaging in a comprehensive cycle of analysis, summarizing, exploration, reassessment, reflection, backtracing, and iteration to develop well-considered thinking process. Please structure your response into two main sections: Thought and Solution using the specified format: <think> {Thought section} </think> {Solution section}. In the Thought section, detail your reasoning process in steps. Each step should include detailed considerations such as analysing questions, summarizing relevant findings, brainstorming new ideas, verifying the accuracy of the current steps, refining any errors, and revisiting previous steps. In the Solution section, based on various attempts, explorations, and reflections from the Thought section, systematically present the final solution that you deem correct. The Solution section should be logical, accurate, and concise and detail necessary steps needed to reach the conclusion. Now, try to solve the following question through the above guidelines:<|im_end|>"
+        super().__init__(model_name, system_prompt, server_node)
+
+class GPTOSS120BChatbot(Chatbot):
+    def __init__(self, model_name="gpt-oss-120b", server_node="localhost"):
+        """
+        Initialize the chatbot with vLLM.
+        
+        Args:
+            model_name: Hugging Face model name/path
+        """
+        system_prompt = "<|im_start|>system\nYou are a helpful assistant. Reasoning: medium.<|im_end|>"
+        super().__init__(model_name, system_prompt, server_node)
+        
 def configure_and_start_chat_ops(first_prompt, server_node="localhost", ops_model_name="Qwen/Qwen3-8B"):
-    # Load Qwen3 model and tokenizer from Hugging Face Hub
-    chatbot = QwenChatbot(model_name=ops_model_name, hosted=True, server_node=server_node)
+    # Load the LLM and tokenizer from Hugging Face Hub
+    if "Qwen" in ops_model_name:
+        chatbot = QwenChatbot(model_name=ops_model_name, server_node=server_node)
+    elif ops_model_name == "microsoft/Phi-4-reasoning":
+        chatbot = Phi4ReasoningChatbot(model_name=ops_model_name, server_node=server_node)
+    elif ops_model_name == "openai/gpt-oss-120b":
+        chatbot = GPTOSS120BChatbot(model_name=ops_model_name, server_node=server_node)
+    else:
+        raise ValueError(f"Unsupported ops_model_name: {ops_model_name}")
     print(f"Initialized {ops_model_name}")
     # Start a conversation
     response = chatbot.generate_response(first_prompt)
@@ -311,6 +346,7 @@ class ConversationHolder:
         server_node="localhost",  # Default to localhost if not specified,
         default_choice="UCB",
         ops_model_name="Qwen/Qwen3-8B",
+        api_type="gemini",
     ):
         self.llm = llm
         self.full_choice_list = full_choice_list
@@ -318,7 +354,7 @@ class ConversationHolder:
         self.token_count = 0  # Initialize token count
         self.money_cost = 0.0  # Initialize money cost
         if self.llm == "api":
-            self.chat, initial_response = configure_and_start_chat_api(first_prompt)
+            self.chat, initial_response, self.conversation_id = configure_and_start_chat_api(first_prompt, api_type=api_type)
             self.messages.append(initial_response)
             self.api_initial_delay_seconds = 1
             self.api_max_entries = 10
@@ -327,6 +363,7 @@ class ConversationHolder:
             self.chatbot = configure_and_start_chat_ops(first_prompt, server_node, ops_model_name)
             self.messages.append(self.chatbot.history[-1]["content"])
         self.default_choice = default_choice
+        self.api_type = api_type
 
     def _api_process_suggestion_response(self, response_text):
         """
@@ -352,6 +389,25 @@ class ConversationHolder:
         self.messages.append(response_text.strip())
         return response
 
+    def _get_api_response_text(self, prompt):
+        if self.api_type == "gemini":
+            response = self.chat.send_message(
+                prompt,
+                generation_config=generation_types.GenerationConfig(
+                    temperature=0.0,
+                )
+            )
+            response = response.text
+        elif self.api_type == "gpt":
+            response = self.chat.responses.create(
+                model="gpt-4o-mini",
+                conversation_id=self.conversation_id,
+                input=prompt,
+                temperature=0.0,
+            )
+            response = response.output_text
+        return response
+
     def _api_suggest_acq_type(self, prompt):
         retries = 0
         current_delay = self.api_initial_delay_seconds
@@ -360,23 +416,17 @@ class ConversationHolder:
         while retries < self.api_max_entries:
             try:
                 # Send the updated summary to the active chat
-                response = self.chat.send_message(
-                    prompt,
-                    generation_config=generation_types.GenerationConfig(
-                        temperature=0.0,
-                    )
-                )
+                response = self._get_api_response_text(prompt)
 
-                if response.text:
-                    llm_suggested_af = self._api_process_suggestion_response(response.text)
+                if response:
+                    llm_suggested_af = self._api_process_suggestion_response(response)
                     # Update token count and cost (replace with actual logic)
                     input_tokens = len(prompt.split())  # Rough estimate
-                    output_tokens = len(response.text.split())  # Rough estimate
+                    output_tokens = len(response.split())  # Rough estimate
                     self.token_count += input_tokens + output_tokens
                     # Replace with actual pricing
                     self.money_cost += (input_tokens * 0.3/1e6) + (output_tokens * 2.5/1e6) 
                     break # Success, exit retry loop
-
                 else:
                     print("LLM returned no text content in response.")
                     self.messages.append("LLM returned no text content in response.")
@@ -544,11 +594,11 @@ class ConversationHolder:
 
     def _api_last_guess(self, last_prompt):
         try:
-            response = self.chat.send_message(last_prompt)
-            if response.text:
-                print(response.text)
-                self.messages.append(response.text.strip()) 
-                return response.text.strip()
+            response = self._get_api_response_text(last_prompt)
+            if response:
+                print(response)
+                self.messages.append(response.strip()) 
+                return response.strip()
             else:
                 print("No text guesses")
                 return "No guesses"

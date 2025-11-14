@@ -183,6 +183,7 @@ def run_problem(
                 LanguageModelAssistedAdaptiveBOAblation
             )
             llm = "api" if "ops" not in acq_type else "ops"
+            api_type = "gpt" if "gpt" in acq_type else "gemini"
             kwargs = {
                 "objective_func": objective_func,
                 "X_init": fixed_train_X,
@@ -191,6 +192,7 @@ def run_problem(
                 "num_iterations": num_iterations,
                 "llm": llm,
                 "server_node": server_node,
+                "api_type": api_type,
             }
             # run LMABO
             if "-ab" in acq_type:
@@ -207,24 +209,6 @@ def run_problem(
             # optimize and get results
             simple_regret, cum_regret, train_X, train_Y, acq_type_list, messages = LMABO.optimize()
             del LMABO  # Free memory
-        # elif acq_type in ["lmabo2", "lmabo2-ops"]:
-        #     from lmabo import LanguageModelAssistedAdaptiveBO2
-        #     if acq_type == "lmabo2":
-        #         llm = "api"
-        #     elif acq_type == "lmabo2-ops":
-        #         llm = "ops"
-        #     LMABO2 = LanguageModelAssistedAdaptiveBO2(                
-        #         objective_func, 
-        #         fixed_train_X, 
-        #         fixed_train_Y, 
-        #         bounds, 
-        #         num_iterations,
-        #         llm,
-        #         server_node,
-        #     )
-        #     # optimize and get results
-        #     simple_regret, cum_regret, train_X, train_Y, acq_type_list, choice_list, messages = LMABO2.optimize()
-        #     del LMABO2  # Free memory
         elif acq_type in ["gphedge", "gphedge-curated"]:
             from baselines.gp_hedge import gp_hedge_full_loop
             simple_regret, cum_regret, train_X, train_Y, weights, acq_type_list = gp_hedge_full_loop(

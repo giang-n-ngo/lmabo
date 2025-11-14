@@ -277,7 +277,8 @@ class LanguageModelAssistedAdaptiveBO:
         llm="api",
         server_node="localhost",
         initial_prompt=None,
-        ops_model_name="Qwen/Qwen3-8B"
+        ops_model_name="Qwen/Qwen3-8B",
+        api_type="gemini",
     ):
         self.objective_func = objective_func
         self.train_X  = X_init.clone()
@@ -298,7 +299,8 @@ class LanguageModelAssistedAdaptiveBO:
             full_choice_list=list(ACQ_TYPE_MAPPING.keys()),
             server_node=server_node,
             default_choice="UCB",  # Default acquisition function
-            ops_model_name=ops_model_name
+            ops_model_name=ops_model_name,
+            api_type=api_type,
         )
 
     def _construct_prompt(self):
