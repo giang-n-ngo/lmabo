@@ -1,11 +1,11 @@
 #!/bin/bash
-#SBATCH --job-name=lmabo-gpt
-#SBATCH --output=log/lmabo-gpt.out
-#SBATCH --error=log/lmabo-gpt.err
+#SBATCH --job-name=lmabo-ops6-2
+#SBATCH --output=log/lmabo-ops6-2.out
+#SBATCH --error=log/lmabo-ops6-2.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=24:00:00 
+#SBATCH --time=12:00:00 
 #SBATCH --mem=32GB                    
 #SBATCH --cpus-per-gpu=16             
 #SBATCH --qos=batch-short
@@ -20,13 +20,13 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    "Ackley" 
+    # "Ackley" 
     "Beale" 
-    "Bukin" 
+    # "Bukin" 
     "Cosine8" 
     "DixonPrice" 
     "DropWave" 
-    "EggHolder" 
+    # "EggHolder" 
     "Griewank" 
     "Hartmann" 
     "HolderTable" 
@@ -58,11 +58,11 @@ problems=(
     "hpt_digits_RandomForest"
     "hpt_digits_DecisionTree"
     "hpt_digits_SVM"
-    "hpt_digits_AdaBoost"
+    # "hpt_digits_AdaBoost"
     "hpt_digits_MLPSGD"
     "hpt_wine_RandomForest"
     "hpt_wine_DecisionTree"
-    "hpt_wine_SVM"
+    # "hpt_wine_SVM"
     "hpt_wine_AdaBoost"
     "hpt_wine_MLPSGD"
     "hpt_diabetes_RandomForest"
@@ -90,6 +90,6 @@ run_batch "${problems[@]:16:8}"   # Problems 16-23
 run_batch "${problems[@]:24:8}"   # Problems 24-31
 run_batch "${problems[@]:32:8}"   # Problems 32-39
 run_batch "${problems[@]:40:8}"   # Problems 40-47
-run_batch "${problems[@]:48:3}"   # Problems 48-50
+# run_batch "${problems[@]:48:3}"   # Problems 48-50
 
 echo "All problems completed!"
