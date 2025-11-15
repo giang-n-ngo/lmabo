@@ -659,6 +659,7 @@ if __name__=="__main__":
     # exclude some methods during the main report
     excluded_methods = [
         "random_acq",
+        "lmabo-gpt",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
     # Redirect output to file

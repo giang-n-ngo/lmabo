@@ -2,7 +2,7 @@
 #SBATCH --output=log/report.out
 #SBATCH --error=log/report.err
 #SBATCH --nodes=1
-#SBATCH --partition=cpu
+#SBATCH --partition=gpu
 #SBATCH --time=00:10:00 
 #SBATCH --cpus-per-task=1
 #SBATCH --qos=batch-short
