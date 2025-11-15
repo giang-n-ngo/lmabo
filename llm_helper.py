@@ -5,6 +5,7 @@ from urllib import response
 import google.generativeai as genai
 from google.api_core.exceptions import ResourceExhausted
 from google.generativeai.types import generation_types
+import openai
 
 from key import GEMINI_API_KEYS, OPENAI_API_KEY
 
@@ -79,34 +80,31 @@ def start_chat_gemini(first_prompt):
         print(f"Gemini's initial acknowledgement: {initial_response.text.strip()}")
         return chat, initial_response.text.strip()
     except Exception as e:
-        print(f"Error starting chat or initial acknowledgement: {e}")
-        print("Please check your API key, model availability, and network connection.")
-        exit() # Exit if we can't even start the chat
+        raise e
     
 def start_chat_gpt(first_prompt):
-    from openai import OpenAI
+    global openai_api_key 
     openai_api_key = OPENAI_API_KEY[0]
     openai_api_base = "https://api.openai.com/v1"
 
-    client = OpenAI(
+    client = openai.OpenAI(
         api_key=openai_api_key,
         base_url=openai_api_base,
     )
     print("Starting GPT chat session with initial context...")
     try:
-        conversation_id = "we_use_llm_to_adaptively_select_acq_function"
+        conversation = client.conversations.create()
         response = client.responses.create(
             model="gpt-4o-mini",
-            conversation_id=conversation_id,
-            input=first_prompt,
+            input=[{"role": "user", "content": first_prompt}],
+            conversation=conversation.id,
+            temperature=0.0,
         )
         initial_response = response.output_text.strip()
         print(f"GPT's initial acknowledgement: {initial_response}")
-        return client, initial_response, conversation_id
+        return client, initial_response, conversation.id
     except Exception as e:
-        print(f"Error starting chat or initial acknowledgement: {e}")
-        print("Please check your API key, model availability, and network connection.")
-        exit() # Exit if we can't even start the chat
+        raise e
 
 def configure_and_start_chat_api(first_prompt, api_type="gemini"):
     if api_type == "gemini":
@@ -401,8 +399,8 @@ class ConversationHolder:
         elif self.api_type == "gpt":
             response = self.chat.responses.create(
                 model="gpt-4o-mini",
-                conversation_id=self.conversation_id,
-                input=prompt,
+                conversation=self.conversation_id,
+                input=[{"role": "user", "content": prompt}],
                 temperature=0.0,
             )
             response = response.output_text
