@@ -10,6 +10,7 @@ from constants import (
 from test_functions.test_function_loader import load_objective_func
 
 import argparse
+import json
 import numpy as np
 import os
 import torch
@@ -143,6 +144,12 @@ def generate_initial_data(
         train_Y = objective_func(train_X).unsqueeze(-1)
     return train_X, train_Y
 
+def context_loader(problem):
+    """Load context message for some specific problems."""
+    with open("test_functions/contexts.json", "r") as f:
+        contexts = json.load(f)
+    return contexts.get(problem, "")
+
 def run_problem(
     problem,
     acq_type=None, 
@@ -184,6 +191,7 @@ def run_problem(
             )
             llm = "api" if "ops" not in acq_type else "ops"
             api_type = "gpt" if "gpt" in acq_type else "gemini"
+            context_component = context_loader(problem) if "context" in acq_type else ""
             kwargs = {
                 "objective_func": objective_func,
                 "X_init": fixed_train_X,
@@ -193,6 +201,7 @@ def run_problem(
                 "llm": llm,
                 "server_node": server_node,
                 "api_type": api_type,
+                "context_component": context_component,
             }
             # run LMABO
             if "-ab" in acq_type:
@@ -285,6 +294,24 @@ def run_problem(
                 bounds,
                 num_iterations,
             )
+        elif acq_type == "random_acq_curated1":
+            from baselines.random_acq import random_acq_full_loop
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list = random_acq_full_loop(
+                objective_func,
+                ["EI", "LogEI", "TS"],
+                fixed_train_X, fixed_train_Y,
+                bounds,
+                num_iterations,
+            )    
+        elif acq_type == "random_acq_curated2":
+            from baselines.random_acq import random_acq_full_loop
+            simple_regret, cum_regret, train_X, train_Y, acq_type_list = random_acq_full_loop(
+                objective_func,
+                ["EI", "TS", "UCB", "PosMean"],
+                fixed_train_X, fixed_train_Y,
+                bounds,
+                num_iterations,
+            )            
         else:
             from baselines.bo import bo_full_loop
             # run fixed acq_type

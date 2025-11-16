@@ -95,6 +95,7 @@ ACQ_TYPE_MAPPING = {
 ALGO_FILE_COUNT = {
     "lmabo": 6,
     "lmabo-gpt": 6,
+    "lmabo-context": 6,
     "lmabo-ops": 6,
     # "lmabo-ops2": 6,
     "lmabo-ops3": 6,
@@ -115,6 +116,8 @@ ALGO_FILE_COUNT = {
     "esp": 5,
     "esp-curated": 5,
     "random_acq": 5,
+    "random_acq_curated1": 5,
+    "random_acq_curated2": 5,
     "llmgp": 3,
     "llambo": 3,
     "bo_alternating_k1": 4,

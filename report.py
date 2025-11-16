@@ -245,6 +245,8 @@ methods_order = [
     "llambo",
     "llmgp",
     "random_acq",
+    "random_acq_curated1",
+    "random_acq_curated2",
     "gphedge",
     "no_past_bo",
     "setup_bo",
@@ -282,6 +284,8 @@ method_name_mapping = {
     "llambo": "LLAMBO",
     "llmgp": "LLMP",
     "random_acq": "Random AF",
+    "random_acq_curated1": "Random AF (3)",
+    "random_acq_curated2": "Random AF (4)",
     "gphedge": "GP-Hedge",
     "gphedge-curated": "GP-Hedge-Curated",
     "no_past_bo": "No-PASt-BO",
@@ -291,6 +295,7 @@ method_name_mapping = {
     "esp": "ESP",
     "esp-curated": "ESP-Curated",
     "lmabo": "LMABO",
+    "lmabo-context": "LMABO-Context",
     "lmabo-gpt": "LMABO-GPT",
     "lmabo-ab1": "LMABO-AB1",
     "lmabo-ab2": "LMABO-AB2",
@@ -658,8 +663,11 @@ if __name__=="__main__":
         all_problems = [p for p in final_problems if p in HPT_FUNCTIONS_NAMES]
     # exclude some methods during the main report
     excluded_methods = [
-        "random_acq",
+        # "random_acq",
+        # "random_acq_curated1",
+        # "random_acq_curated2",
         "lmabo-gpt",
+        "lmabo-context",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
     # Redirect output to file
