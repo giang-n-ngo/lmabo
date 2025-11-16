@@ -663,7 +663,6 @@ if __name__=="__main__":
         all_problems = [p for p in final_problems if p in HPT_FUNCTIONS_NAMES]
     # exclude some methods during the main report
     excluded_methods = [
-        "lmabo-gpt",
         "lmabo-context",
     ]
     all_methods = [method for method in all_methods if method not in excluded_methods]
