@@ -20,10 +20,10 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    # # # "Ackley" 
+    # # "Ackley" 
     # "Beale" 
-    # "Bukin" 
-    # "Cosine8" 
+    # # "Bukin" 
+    # # "Cosine8" 
     # "DixonPrice" 
     # "DropWave" 
     # # "EggHolder" 
@@ -36,31 +36,31 @@ problems=(
     # # "SixHumpCamel" 
     # "StyblinskiTang" 
     # # "BucheRastrigin" 
-    # # # "LinearSlope" 
+    # # "LinearSlope" 
     # "AttractiveSector" 
     # "StepEllipsoid" 
-    # "Discus" 
-    # "BentCigar" 
-    "SharpRidge" 
+    "Discus" 
+    "BentCigar" 
+    # "SharpRidge" 
     "DifferentPowers" 
-    "Weierstrass" 
+    # "Weierstrass" 
     "SchaffersIllCond" 
     "CompositeGriewankRosenbrock" 
     "Gallagher21" 
     # "Gallagher101" 
-    "Katsuura" 
+    # "Katsuura" 
     "LunacekBiRastrigin" 
-    "hpt_breast_RandomForest"
+    # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
     "hpt_breast_SVM"
     # "hpt_breast_AdaBoost"
-    "hpt_breast_MLPSGD"
+    # "hpt_breast_MLPSGD"
     # "hpt_digits_RandomForest"
     # "hpt_digits_DecisionTree"
     # "hpt_digits_SVM"
     # "hpt_digits_AdaBoost"
     # "hpt_digits_MLPSGD"
-    "hpt_wine_RandomForest"
+    # "hpt_wine_RandomForest"
     # "hpt_wine_DecisionTree"
     # "hpt_wine_SVM"
     # "hpt_wine_AdaBoost"
@@ -68,7 +68,7 @@ problems=(
     # "hpt_diabetes_RandomForest"
     # "hpt_diabetes_DecisionTree"
     # "hpt_diabetes_SVM"
-    "hpt_diabetes_AdaBoost"
+    # "hpt_diabetes_AdaBoost"
     # "hpt_diabetes_MLPSGD"
 )
 
@@ -85,7 +85,7 @@ run_batch() {
 # Split into batches of 8 problems for 17 problems
 echo "Running problems in batches of 8..."
 run_batch "${problems[@]:0:8}"    # Problems 0-7
-run_batch "${problems[@]:8:8}"   # Problems 8-15
+# run_batch "${problems[@]:8:8}"   # Problems 8-15
 # run_batch "${problems[@]:16:1}"   # Problems 16-23
 # run_batch "${problems[@]:24:8}"   # Problems 24-31
 # run_batch "${problems[@]:32:8}"   # Problems 32-39
