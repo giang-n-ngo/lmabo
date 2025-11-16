@@ -4,9 +4,9 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=24:00:00 
-#SBATCH --mem=40G                    
-#SBATCH --cpus-per-gpu=40             
+#SBATCH --time=8:00:00 
+#SBATCH --mem=8G                    
+#SBATCH --cpus-per-gpu=8             
 #SBATCH --qos=batch-short
 #SBATCH --mail-type=END
 #SBATCH --mail-user=s222509501@deakin.edu.au
@@ -33,26 +33,26 @@ problems=(
     # "Michalewicz" 
     # "Shekel" 
     # "SixHumpCamel" 
-    # "StyblinskiTang" 
+    "StyblinskiTang" 
     # "BucheRastrigin" 
     # "LinearSlope" 
     # "AttractiveSector" 
     # "StepEllipsoid" 
-    "Discus" 
+    # "Discus" 
     # "BentCigar" 
     # "SharpRidge" 
     # "DifferentPowers" 
     # "Weierstrass" 
     # "SchaffersIllCond" 
     # "CompositeGriewankRosenbrock" 
-    "Gallagher21" 
-    "Gallagher101" 
-    "Katsuura" 
-    "LunacekBiRastrigin" 
-    "hpt_breast_RandomForest"
-    "hpt_breast_DecisionTree"
-    "hpt_breast_SVM"
-    "hpt_breast_AdaBoost"
+    # "Gallagher21" 
+    # "Gallagher101" 
+    # "Katsuura" 
+    # "LunacekBiRastrigin" 
+    # "hpt_breast_RandomForest"
+    # "hpt_breast_DecisionTree"
+    # "hpt_breast_SVM"
+    # "hpt_breast_AdaBoost"
     # "hpt_breast_MLPSGD"
     # "hpt_digits_RandomForest"
     # "hpt_digits_DecisionTree"
@@ -93,7 +93,7 @@ run_batch() {
 # Split into batches of 5 problems for 50 problems
 echo "Running problems in batches of 5..."
 run_batch "${problems[@]:0:5}"    # Problems 0-4
-run_batch "${problems[@]:5:5}"   # Problems 5-9
+# run_batch "${problems[@]:5:5}"   # Problems 5-9
 # run_batch "${problems[@]:10:5}"    # Problems 10-14
 # run_batch "${problems[@]:15:5}"    # Problems 15-19
 # run_batch "${problems[@]:16:4}"   # Problems 16-19

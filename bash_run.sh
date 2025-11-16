@@ -2,7 +2,7 @@
 
 methods=(
     # "lmabo"
-    # "lmabo-gpt"
+    "lmabo-gpt"
     # "lmabo-context"
     # "lmabo-ab1"
     # "lmabo-ab2"
@@ -18,7 +18,7 @@ methods=(
     # "no_past_bo-curated"
     # "setup_bo"
     # "setup_bo-curated"
-    "random_acq"
+    # "random_acq"
     # "random_acq_curated1"
     # "random_acq_curated2"
     # "bo_alternating_k1"
