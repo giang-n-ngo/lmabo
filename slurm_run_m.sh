@@ -21,37 +21,37 @@ CUDA_LAUNCH_BLOCKING=1
 
 problems=(
     # # # "Ackley" 
-    # # "Beale" 
-    # # # "Bukin" 
-    # # "Cosine8" 
+    # "Beale" 
+    # "Bukin" 
+    # "Cosine8" 
     # "DixonPrice" 
-    # # "DropWave" 
-    # # # "EggHolder" 
-    # # # "Griewank" 
+    # "DropWave" 
+    # # "EggHolder" 
+    # # "Griewank" 
     # "Hartmann" 
     # # "HolderTable" 
     # "Levy" 
     # # "Michalewicz" 
     # "Shekel" 
     # # "SixHumpCamel" 
-    # # "StyblinskiTang" 
-    # "BucheRastrigin" 
+    # "StyblinskiTang" 
+    # # "BucheRastrigin" 
     # # # "LinearSlope" 
     # "AttractiveSector" 
     # "StepEllipsoid" 
     # "Discus" 
-    # # "BentCigar" 
-    # "SharpRidge" 
-    # "DifferentPowers" 
-    # "Weierstrass" 
+    # "BentCigar" 
+    "SharpRidge" 
+    "DifferentPowers" 
+    "Weierstrass" 
     "SchaffersIllCond" 
     "CompositeGriewankRosenbrock" 
-    # "Gallagher21" 
+    "Gallagher21" 
     # "Gallagher101" 
     "Katsuura" 
     "LunacekBiRastrigin" 
     "hpt_breast_RandomForest"
-    "hpt_breast_DecisionTree"
+    # "hpt_breast_DecisionTree"
     "hpt_breast_SVM"
     # "hpt_breast_AdaBoost"
     "hpt_breast_MLPSGD"
@@ -84,8 +84,8 @@ run_batch() {
 
 # Split into batches of 8 problems for 17 problems
 echo "Running problems in batches of 8..."
-run_batch "${problems[@]:0:5}"    # Problems 0-7
-run_batch "${problems[@]:5:5}"   # Problems 8-15
+run_batch "${problems[@]:0:8}"    # Problems 0-7
+run_batch "${problems[@]:8:8}"   # Problems 8-15
 # run_batch "${problems[@]:16:1}"   # Problems 16-23
 # run_batch "${problems[@]:24:8}"   # Problems 24-31
 # run_batch "${problems[@]:32:8}"   # Problems 32-39
