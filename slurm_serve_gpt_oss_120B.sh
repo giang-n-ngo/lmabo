@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=gptoss-120b-2
-#SBATCH --output=log/gptoss-120b-2.out
-#SBATCH --error=log/gptoss-120b-2.err
+#SBATCH --job-name=gptoss-120b
+#SBATCH --output=log/gptoss-120b.out
+#SBATCH --error=log/gptoss-120b.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu-large
 #SBATCH --gpus=h200:1

@@ -1,7 +1,7 @@
 #!/bin/bash
-#SBATCH --job-name=lmabo-ops6
-#SBATCH --output=log/lmabo-ops6.out
-#SBATCH --error=log/lmabo-ops6.err
+#SBATCH --job-name=lmabo-ops6-2
+#SBATCH --output=log/lmabo-ops6-2.out
+#SBATCH --error=log/lmabo-ops6-2.err
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
@@ -20,39 +20,39 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    # "Ackley" 
+    # # "Ackley" 
     # "Beale" 
-    # "Bukin" 
-    # "Cosine8" 
+    # # "Bukin" 
+    # # "Cosine8" 
     # "DixonPrice" 
     # "DropWave" 
-    # "EggHolder" 
-    # "Griewank" 
+    # # "EggHolder" 
+    # # "Griewank" 
     # "Hartmann" 
-    # "HolderTable" 
-    "Levy" 
-    # "Michalewicz" 
+    # # "HolderTable" 
+    # "Levy" 
+    # # "Michalewicz" 
     # "Shekel" 
-    # "SixHumpCamel" 
+    # # "SixHumpCamel" 
     # "StyblinskiTang" 
-    # "BucheRastrigin" 
-    # "LinearSlope" 
+    # # "BucheRastrigin" 
+    # # "LinearSlope" 
     # "AttractiveSector" 
-    # "StepEllipsoid" 
-    # "Discus" 
-    # "BentCigar" 
+    "StepEllipsoid" 
+    "Discus" 
+    "BentCigar" 
     # "SharpRidge" 
-    # "DifferentPowers" 
+    "DifferentPowers" 
     # "Weierstrass" 
     # "SchaffersIllCond" 
     # "CompositeGriewankRosenbrock" 
-    # "Gallagher21" 
+    "Gallagher21" 
     # "Gallagher101" 
     # "Katsuura" 
-    # "LunacekBiRastrigin" 
+    "LunacekBiRastrigin" 
     # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
-    # "hpt_breast_SVM"
+    "hpt_breast_SVM"
     # "hpt_breast_AdaBoost"
     # "hpt_breast_MLPSGD"
     # "hpt_digits_RandomForest"
@@ -77,7 +77,7 @@ run_batch() {
     local batch=("$@")
     for problem in "${batch[@]}"; do
         echo "Starting problem: $problem"
-        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops6 --server_node h200l-m-03 &
+        CUDA_VISIBLE_DEVICES=0 python run.py --problem $problem --method lmabo-ops6 --server_node h200l-m-02 &
     done
     wait  # Wait for this batch to complete
 }
