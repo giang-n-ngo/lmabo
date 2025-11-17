@@ -30,5 +30,5 @@ methods=(
 # Loop over each problem and algorithm
 for method in "${methods[@]}"; do
     echo "Submitting job: ${method}"
-    sbatch --job-name="${method}_2" --export=method=$method slurm_run.sh
+    sbatch --job-name="${method}" --export=method=$method slurm_run.sh
 done
