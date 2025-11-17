@@ -4,7 +4,7 @@
 #SBATCH --nodes=1
 #SBATCH --partition=gpu
 #SBATCH --gpus=1
-#SBATCH --time=8:00:00 
+#SBATCH --time=4:00:00 
 #SBATCH --mem=8G                    
 #SBATCH --cpus-per-gpu=8             
 #SBATCH --qos=batch-short
@@ -19,55 +19,55 @@ conda activate lmabo
 CUDA_LAUNCH_BLOCKING=1
 
 problems=(
-    # # "Ackley" 
-    # # "Beale" 
+    # "Ackley" 
+    # "Beale" 
     # "Bukin" 
-    # # "Cosine8" 
+    # "Cosine8" 
     # "DixonPrice" 
     # "DropWave" 
     # "EggHolder" 
     # "Griewank" 
     # "Hartmann" 
     # "HolderTable" 
-    # # "Levy" 
-    # # "Michalewicz" 
+    # "Levy" 
+    # "Michalewicz" 
     # "Shekel" 
-    # # "SixHumpCamel" 
+    # "SixHumpCamel" 
     # "StyblinskiTang" 
     # "BucheRastrigin" 
-    # # "LinearSlope" 
+    # "LinearSlope" 
     # "AttractiveSector" 
-    # "StepEllipsoid" 
-    "Discus" 
+    "StepEllipsoid" 
+    # "Discus" 
     "BentCigar" 
     # "SharpRidge" 
     # "DifferentPowers" 
     # "Weierstrass" 
-    # "SchaffersIllCond" 
+    "SchaffersIllCond" 
     # "CompositeGriewankRosenbrock" 
     # "Gallagher21" 
     # "Gallagher101" 
     # "Katsuura" 
-    # "LunacekBiRastrigin" 
-    # # "hpt_breast_RandomForest"
+    "LunacekBiRastrigin" 
+    # "hpt_breast_RandomForest"
     # "hpt_breast_DecisionTree"
-    # "hpt_breast_SVM"
-    # # "hpt_breast_AdaBoost"
+    "hpt_breast_SVM"
+    # "hpt_breast_AdaBoost"
     # "hpt_breast_MLPSGD"
     # "hpt_digits_RandomForest"
     # "hpt_digits_DecisionTree"
-    # # "hpt_digits_SVM"
-    # # "hpt_digits_AdaBoost"
+    # "hpt_digits_SVM"
+    # "hpt_digits_AdaBoost"
     # "hpt_digits_MLPSGD"
-    # # "hpt_wine_RandomForest"
+    # "hpt_wine_RandomForest"
     # "hpt_wine_DecisionTree"
-    # # "hpt_wine_SVM"
-    # # "hpt_wine_AdaBoost"
-    # # "hpt_wine_MLPSGD"
-    # # "hpt_diabetes_RandomForest"
+    # "hpt_wine_SVM"
+    # "hpt_wine_AdaBoost"
+    # "hpt_wine_MLPSGD"
+    # "hpt_diabetes_RandomForest"
     # "hpt_diabetes_DecisionTree"
-    # "hpt_diabetes_SVM"
-    # # "hpt_diabetes_AdaBoost"
+    "hpt_diabetes_SVM"
+    # "hpt_diabetes_AdaBoost"
     # "hpt_diabetes_MLPSGD"
 )
 
@@ -90,12 +90,12 @@ run_batch() {
     wait  # Wait for this batch to complete
 }
 
-# Split into batches of 3 problems for 12 problems
+# Split into batches of 3 problems for 11 problems
 echo "Running problems in batches of 4..."
-run_batch "${problems[@]:0:4}"    # Problems 0-3
-# run_batch "${problems[@]:4:4}"   # Problems 4-7
-# run_batch "${problems[@]:8:4}"    # Problems 8-11
-# run_batch "${problems[@]:12:4}"    # Problems 12-15
+run_batch "${problems[@]:0:3}"    # Problems 0-3
+run_batch "${problems[@]:3:3}"   # Problems 4-7
+run_batch "${problems[@]:6:3}"    # Problems 8-11
+# run_batch "${problems[@]:9:2}"    # Problems 12-15
 # run_batch "${problems[@]:16:4}"   # Problems 16-19
 # run_batch "${problems[@]:20:4}"   # Problems 20-23
 # run_batch "${problems[@]:24:4}"   # Problems 24-27
