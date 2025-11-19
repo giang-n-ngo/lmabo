@@ -31,7 +31,7 @@ def test_api_key(key):
     """
     try:
         genai.configure(api_key=key)
-        model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20')
+        model = genai.GenerativeModel('gemini-2.5-flash-preview-09-2025')
         chat = model.start_chat()
         response = chat.send_message("Test message")
         return True
@@ -66,7 +66,7 @@ def start_chat_gemini(first_prompt):
     genai.configure(api_key=valid_key)
     # init LLM
     model = genai.GenerativeModel(
-        'gemini-2.5-flash-preview-05-20', 
+        'gemini-2.5-flash-preview-09-2025', 
     )
     # --- START THE CHAT SESSION ---
     print("Starting Gemini chat session with initial context...")

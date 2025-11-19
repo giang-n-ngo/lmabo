@@ -2,8 +2,8 @@
 
 methods=(
     # "lmabo"
-    "lmabo-gpt"
-    # "lmabo-context"
+    # "lmabo-gpt"
+    "lmabo-context"
     # "lmabo-ab1"
     # "lmabo-ab2"
     # "lmabo-ab3"

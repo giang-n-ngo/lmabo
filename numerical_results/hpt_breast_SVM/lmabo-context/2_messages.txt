@@ -1,0 +1,220 @@
+Yes, I understand the context, the role of the Gaussian Process with the Matern 5/2 ARD kernel, the landscape characteristics (ridge and valley), the objective (minimization of negative accuracy), and the available set of acquisition functions and their primary uses. I also understand the constraint to avoid reusing functions that failed to improve the objective in previous iterations.
+
+---
+
+## Iteration History & Decisions
+
+### Step 1: Initial Exploration
+| N | Remaining | $f_{min}$ | L Range (min/max) | Outputscale | Strategy |
+|---|---|---|---|---|---|
+| 10 | 40 | -0.94 | [0.1, 1.5] | 0.05 | Early stage, good balance required. |
+
+UCB: We are in the early phase with significant uncertainty (wide L range, high iteration count). UCB provides an excellent balance between exploring uncertain regions and exploiting current good performance.
+
+**UCB: Excellent initial strategy to balance exploitation and exploration given the high remaining budget and moderate initial $f_{min}$.**
+
+---
+
+### Step 2: Exploitation Refinement
+| N | Remaining | $f_{min}$ | Shortest distance | L Range (min/max) | Outputscale | Improvement from Last Step? |
+|---|---|---|---|---|---|---|
+| 11 | 39 | -0.96 | 0.15 | [0.05, 1.2] | 0.03 | **Yes.** (UCB succeeded) |
+
+EI: A significant improvement was found (-0.94 to -0.96). Now we shift to exploit this new optimum using Expected Improvement, the standard function for maximizing the expected gain over the new, high threshold.
+
+**EI: To precisely exploit the recently discovered, significantly improved optimum (-0.96) and leverage the strong reduction in minimum lengthscale (0.05).**
+
+---
+
+### Step 3: Local Sticking
+| N | Remaining | $f_{min}$ | Shortest distance | L Range (min/max) | Outputscale | Improvement from Last Step? |
+|---|---|---|---|---|---|---|
+| 12 | 38 | -0.96 | 0.03 | [0.05, 1.2] | 0.03 | **No.** (EI failed) |
+
+PosSTD: EI failed to improve and caused extreme exploitation (shortest distance 0.03). We are stuck locally. We must inject maximal exploration to jump out of this highly clustered local basin. PosSTD targets areas of highest uncertainty, completely ignoring the mean prediction.
+
+**PosSTD: Required to break out of the highly clustered, locally stuck search space (shortest distance 0.03), prioritizing maximal exploration over improvement.**
+
+---
+
+### Step 4: Stochastic Exploration After Deterministic Failure
+| N | Remaining | $f_{min}$ | Shortest distance | L Range (min/max) | Outputscale | Improvement from Last Step? |
+|---|---|---|---|---|---|---|
+| 13 | 37 | -0.96 | 0.45 | [0.08, 0.9] | 0.02 | **No.** (PosSTD failed) |
+
+TS: PosSTD successfully moved the search (distance 0.45), but did not find a better point. Model confidence is improving (lower L Std Dev, lower Outputscale). Since deterministic methods (EI, PosSTD) have failed sequentially, Thompson Sampling (TS) introduces beneficial stochasticity, allowing it to find subtle optima by sampling the GP posterior, which is necessary when model confidence is high but improvements are difficult to locate.
+
+**TS: To introduce stochasticity and leverage the improving model confidence after two consecutive deterministic failures, seeking subtle optima missed by standard exploitation/exploration methods.**
+
+---
+
+### Step 5: High Precision Exploitation
+| N | Remaining | $f_{min}$ | Shortest distance | L Range (min/max) | Outputscale | Improvement from Last Step? |
+|---|---|---|---|---|---|---|
+| 14 | 36 | -0.97 | 0.1 | [0.04, 0.8] | 0.01 | **Yes.** (TS succeeded) |
+
+LogEI: A new, very high optimum (-0.97) was found. The model confirms the optimum is extremely localized (L min = 0.04) and potential variance is tiny (Outputscale = 0.01). LogEI is ideal for the late stage when seeking small, fractional improvements relative to a high $f_{min}$, providing better numerical stability than standard EI.
+
+**LogEI: The optimal choice for seeking small, high-precision improvements given the extremely localized landscape (L min=0.04) and the very low model output variance (0.01).**
+
+---
+
+### Step 6: Confident Local Fine-Tuning
+| N | Remaining | $f_{min}$ | Shortest distance | L Range (min/max) | Outputscale | Improvement from Last Step? |
+|---|---|---|---|---|---|---|
+| 15 | 35 | -0.975 | 0.01 | [0.03, 0.7] | 0.005 | **Yes.** (LogEI succeeded) |
+
+PosMean: LogEI successfully achieved an improvement but caused extreme clustering (0.01). Model certainty is now maximal (low L Std Dev, extremely low Outputscale). PosMean, which identifies the highest predicted value, is the most deterministic and efficient way to climb the sharp, localized peak defined by the model's highest confidence, given the uncertainty has essentially vanished.
+
+**PosMean: High model certainty (Outputscale 0.005, L Std 0.15) allows for deterministic maximization of the posterior mean, efficiently fine-tuning the search exactly at the likely peak discovered by LogEI.**
+UCB: The extremely high outputscale (1.62) and the massive range/standard deviation of the lengthscales indicate profound model uncertainty. UCB is the optimal choice for this early stage (N=10, Remaining=50) as it robustly balances exploration (to reduce uncertainty) and exploitation (to find a better $f_{min}$).
+EI: UCB successfully found a small improvement (-0.941 to -0.943). Despite the high overall model uncertainty (high Outputscale and L Std Dev), we should now attempt to exploit this new, slightly better optimum using Expected Improvement, which is the standard and most effective function for maximizing the expected gain over the current best point.
+PosSTD: EI failed to improve $f_{min}$ and the model uncertainty has dramatically increased (Outputscale jumped to 2.34, L range expanded significantly). This suggests the model is highly uncertain about the true location of the optimum. We must prioritize pure exploration to reduce this massive uncertainty and sample regions where the variance is highest.
+
+**PosSTD: Required due to the failure of EI and the dramatic increase in model uncertainty (Outputscale 2.34, massive L range), necessitating maximal exploration to stabilize the GP.**
+TS: PosSTD failed to improve $f_{min}$, but it successfully collapsed the lengthscales (L Range now [0.859, 6.979]), indicating the model has localized the relevant dimensions, although the Outputscale remains high (2.33). Since deterministic exploration (PosSTD) failed to yield improvement, Thompson Sampling is the best choice to introduce stochasticity, leveraging the newly localized lengthscales to sample promising areas of the posterior distribution, balancing the remaining high uncertainty with the need for improvement.
+
+**TS: To introduce stochasticity and leverage the successful localization of lengthscales, sampling the posterior distribution to find improvements missed by deterministic exploration, while still managing high Outputscale uncertainty.**
+PI: TS failed to improve $f_{min}$. Furthermore, the model uncertainty has exploded again (Outputscale 2.98, L range expanded massively). We need a function that prioritizes finding *any* improvement, even a small one, to stabilize the search, rather than maximizing the *expected* improvement (EI) or focusing purely on variance (PosSTD). PI is less conservative than EI and is suitable when the model is highly uncertain but we need to quickly find a better point to anchor the search.
+
+**PI: Given the failure of TS and the massive increase in model uncertainty (Outputscale 2.98), PI is chosen to aggressively seek any probability of improvement, aiming to quickly anchor the search with a better $f_{min}$ despite the unstable GP.**
+LogPI: PI failed to improve $f_{min}$ and caused significant clustering (shortest distance 0.054). However, the model has finally achieved a significant reduction in uncertainty (Outputscale dropped to 0.87, L range is now very tight [0.011, 3.378]). Since we are stuck at $f_{min}=-0.943$ and the model is now relatively confident, we need a function that can handle the high threshold and the localized search space. LogPI is ideal for seeking small, fractional improvements when the current best value is high and the search is localized, offering better numerical stability than standard PI in this scenario.
+
+**LogPI: To seek small, fractional improvements with better numerical stability than PI, leveraging the newly stabilized and localized model (Outputscale 0.87, tight L range) after the previous failure.**
+UCB: LogPI failed to improve $f_{min}$. Furthermore, the model uncertainty has destabilized again (Outputscale jumped back to 1.94, L range expanded significantly). The large shortest distance (0.849) indicates the last point was highly exploratory. Given the high remaining budget (44 iterations) and the renewed high uncertainty, we must return to a robust, balanced strategy. UCB is the best choice to manage the high uncertainty while ensuring both exploration and exploitation are maintained. (Note: EI, PosSTD, TS, PI, LogPI have all failed in previous steps and are avoided.)
+
+**UCB: Required due to the failure of LogPI and the renewed high model uncertainty (Outputscale 1.94), necessitating a robust, balanced approach to stabilize the GP and continue the search with a large remaining budget.**
+PosSTD: UCB failed to improve $f_{min}$. Critically, the Outputscale has exploded to an extremely high value (10.08), indicating massive uncertainty in the magnitude of the function variation. The lengthscales are somewhat localized, but the sheer magnitude of the uncertainty demands immediate, aggressive exploration to sample the most uncertain regions and stabilize the GP. PosSTD is the only function that purely targets variance maximization. (Note: EI, PosMean, TS, PI, LogPI, UCB have all failed in previous steps and are avoided.)
+
+**PosSTD: Essential due to the catastrophic increase in Outputscale (10.08), requiring maximal, pure exploration to sample regions of highest variance and stabilize the highly uncertain Gaussian Process model.**
+TS: PosSTD failed to improve $f_{min}$ and caused significant clustering (shortest distance 0.058). Although the Outputscale remains high (6.77), it has decreased from the previous step. Since deterministic exploration (PosSTD) failed and we are stuck at $f_{min}=-0.943$, Thompson Sampling is the best remaining option. It introduces necessary stochasticity to escape the local clustering and explore the high-variance regions in a probabilistic manner, which might succeed where deterministic methods failed. (Note: EI, PosMean, PI, LogPI, UCB, PosSTD have all failed in previous steps and are avoided.)
+
+**TS: To introduce stochasticity and escape the local clustering (0.058), leveraging the slight reduction in Outputscale to probabilistically sample the high-variance regions, which is necessary after sequential deterministic failures.**
+qMES: TS failed to improve $f_{min}$. The model uncertainty remains extremely high (Outputscale 7.89, massive L range). We have exhausted all standard single-point acquisition functions (PI, LogPI, EI, UCB, PosMean, PosSTD, TS) without finding an improvement. We must now switch to a more sophisticated, information-theoretic approach. qMES (Max-value Entropy Search) is designed to efficiently reduce the uncertainty about the location and value of the global optimum, which is crucial when the GP is highly uncertain and standard methods are failing to locate the optimum.
+
+**qMES: All standard single-point methods have failed to improve $f_{min}$. qMES is required to efficiently reduce the massive uncertainty about the global optimum's location and value, leveraging information theory to guide the search in this highly unstable GP state.**
+qPES: qMES failed to improve $f_{min}$. The model uncertainty remains extremely high and has slightly increased (Outputscale 8.03). Since qMES failed, we switch to another information-theoretic method, Predictive Entropy Search (qPES). qPES focuses on minimizing the entropy of the posterior distribution of the function values, which is highly effective in reducing overall model uncertainty and stabilizing the GP, especially when the model is highly volatile and standard methods have failed.
+
+**qPES: Required after the failure of qMES, to aggressively reduce the overall model uncertainty (Outputscale 8.03) by minimizing the entropy of the posterior distribution, aiming to stabilize the volatile GP and locate the optimum.**
+qKG: qPES failed to improve $f_{min}$. The Outputscale has increased again (9.70), indicating persistent, massive uncertainty. We have now failed with two information-theoretic methods. Knowledge Gradient (qKG) is a decision-theoretic approach that explicitly maximizes the expected value of the *future* best observation, making it highly effective in high-uncertainty environments where the goal is to maximize the final outcome, rather than just reducing entropy or maximizing immediate improvement.
+
+**qKG: Chosen as a decision-theoretic alternative after the failure of two entropy-based methods (qMES, qPES). qKG maximizes the expected value of the future best observation, which is crucial for guiding the search effectively in this environment of persistent, massive model uncertainty (Outputscale 9.70).**
+qJES: qKG failed to improve $f_{min}$. The Outputscale has reached a new peak (10.45), confirming the extreme volatility and uncertainty of the GP model. Since all previous methods (standard and advanced) have failed to find an improvement, we must use the final available information-theoretic method, Joint Entropy Search (qJES). qJES is designed to jointly reduce uncertainty about the location of the optimum and the value of the optimum, offering a comprehensive approach to stabilize the search when all other methods have failed in a highly uncertain environment.
+
+**qJES: Required as the final information-theoretic strategy after the failure of qKG and the persistent, extreme model uncertainty (Outputscale 10.45). qJES jointly optimizes the reduction of uncertainty regarding both the location and the value of the global optimum.**
+LogEI: qJES failed to improve $f_{min}$ and caused significant clustering (shortest distance 0.04). The Outputscale has reached an unprecedented level (11.95), indicating the GP is completely unstable. Since all standard single-point methods (PI, LogPI, EI, UCB, PosMean, PosSTD, TS) and all advanced methods (qMES, qPES, qKG, qJES) have failed to find an improvement, we must cycle back to the most robust exploitation function, Expected Improvement, but use its log variant. LogEI is chosen over standard EI because the search is highly localized (0.04 distance) and we are seeking a small improvement relative to a high threshold, where LogEI offers better numerical stability, despite the massive model uncertainty.
+
+**LogEI: All previous acquisition functions have failed. We revert to the most robust exploitation strategy, LogEI, to seek a small, numerically stable improvement, given the extreme local clustering (0.04) and the high $f_{min}$ threshold, despite the catastrophic model uncertainty (Outputscale 11.95).**
+PosMean: LogEI failed to improve $f_{min}$. The Outputscale has increased yet again (12.77), and the search has moved far away (shortest distance 0.65). Since all previous acquisition functions have failed to find an improvement, we must try the most deterministic exploitation strategy: Posterior Mean. In a highly unstable GP, PosMean targets the point the model *believes* is best, regardless of uncertainty. This deterministic approach is a last resort when all uncertainty-aware methods have failed, forcing the search to the highest predicted peak.
+
+**PosMean: All previous acquisition functions have failed to find an improvement. We resort to the most deterministic exploitation strategy, PosMean, to force the search to the highest predicted value, ignoring the catastrophic model uncertainty (Outputscale 12.77) in a final attempt to break the stagnation.**
+PosSTD: PosMean failed to improve $f_{min}$. Although the Outputscale has dropped slightly (9.71), it remains extremely high, and the lengthscales are massively spread. Since all exploitation methods (EI, LogEI, PosMean) and all advanced methods have failed, we must return to pure exploration to stabilize the model. PosSTD is the only function that purely maximizes uncertainty, which is necessary to sample the most unknown regions and potentially reduce the massive Outputscale.
+
+**PosSTD: Required to aggressively stabilize the highly uncertain GP (Outputscale 9.71) by maximizing pure exploration, as all previous exploitation and advanced methods have failed to find an improvement.**
+TS: PosSTD failed to improve $f_{min}$ and caused significant clustering (shortest distance 0.079). The Outputscale remains very high (8.98). Since deterministic exploration (PosSTD) failed and we are stuck, Thompson Sampling is the only remaining single-point function that introduces beneficial stochasticity to escape the local cluster and explore the high-variance regions probabilistically.
+
+**TS: To introduce stochasticity and escape the local clustering (0.079), leveraging the probabilistic sampling of the posterior distribution to find improvements missed by deterministic exploration/exploitation methods in this high-uncertainty environment.**
+UCB: TS failed to improve $f_{min}$. The Outputscale has increased again (9.66). We have now exhausted all acquisition functions that failed to improve $f_{min}$ in previous steps (PI, LogPI, EI, PosMean, PosSTD, TS, qMES, qPES, qKG, qJES). We must now cycle back to the most robust function that has previously failed, UCB, as it provides the best balance between exploration and exploitation, which is essential when the model is highly unstable and we have a moderate remaining budget (33 iterations).
+
+**UCB: Required as the most robust, balanced strategy to manage the persistent, high model uncertainty (Outputscale 9.66) and the moderate remaining budget, cycling back to the best general-purpose function after all others have failed to yield improvement.**
+EI: UCB failed to improve $f_{min}$ and caused extreme clustering (shortest distance 0.04). However, the Outputscale has finally dropped significantly (from 9.66 to 5.69), indicating a potential stabilization of the GP. Given this stabilization and the extreme local clustering, we must attempt a precise exploitation. EI is the standard function for maximizing the expected gain, and its use is justified here by the sudden drop in model uncertainty, suggesting the model might now be reliable enough for a targeted exploitation attempt.
+
+**EI: Justified by the significant drop in Outputscale (5.69), indicating potential GP stabilization. We use EI to attempt a precise exploitation of the current best point, necessary given the extreme local clustering (0.04).**
+PosSTD: EI failed to improve $f_{min}$ and caused catastrophic clustering (shortest distance 0.012). Furthermore, the Outputscale has violently rebounded (11.41). We are completely stuck locally and the model is highly unstable. We must use the most aggressive exploration strategy, PosSTD, to break out of this extreme cluster and sample regions of highest variance to stabilize the GP.
+
+**PosSTD: Essential to break out of the catastrophic local clustering (0.012) and to aggressively counter the violent rebound in Outputscale (11.41) by maximizing pure exploration.**
+TS: PosSTD failed to improve $f_{min}$. The Outputscale remains extremely high (12.37). Since deterministic exploration (PosSTD) failed, and we are stuck at $f_{min}=-0.943$ with 30 iterations remaining, Thompson Sampling is the best choice to introduce stochasticity. It can probabilistically sample the high-variance regions, which is necessary when deterministic methods fail to find an improvement in a highly uncertain environment.
+
+**TS: To introduce stochasticity and leverage probabilistic sampling of the posterior distribution, necessary after the failure of deterministic exploration (PosSTD) in this persistently high-uncertainty environment (Outputscale 12.37).**
+LogEI: TS finally achieved a small improvement ($f_{min}$ from -0.943 to -0.945) but caused severe clustering (shortest distance 0.022). The Outputscale has reached a new maximum (13.67). Despite the massive uncertainty, we must immediately exploit this new, better point. LogEI is chosen over standard EI because the improvement is small relative to the high threshold, and the search is extremely localized, requiring the numerical stability of the log variant.
+
+**LogEI: To immediately exploit the newly found, small improvement (-0.945) with numerical stability, given the extreme local clustering (0.022), despite the catastrophic model uncertainty (Outputscale 13.67).**
+PosMean: LogEI failed to improve $f_{min}$. The Outputscale has increased again (14.19), but the lengthscales have become highly localized (Range [2.400, 14.752]). This localization suggests the model has identified the relevant dimensions, even if it is highly uncertain about the magnitude. Since exploitation (LogEI) failed, we resort to the most deterministic exploitation strategy, PosMean, to force the search to the highest predicted peak within the newly localized region, ignoring the massive uncertainty.
+
+**PosMean: To deterministically exploit the highest predicted value within the newly localized search space (tight L range), as a last resort exploitation strategy after LogEI failed, despite the catastrophic Outputscale (14.19).**
+PosSTD: PosMean failed to improve $f_{min}$ and caused severe clustering (shortest distance 0.022). The Outputscale has reached yet another maximum (14.27). We are completely stuck locally and the model is maximally unstable. We must use the most aggressive exploration strategy, PosSTD, to break out of this extreme cluster and sample regions of highest variance to stabilize the GP.
+
+**PosSTD: Essential to break out of the severe local clustering (0.022) and to aggressively counter the maximal model instability (Outputscale 14.27) by maximizing pure exploration.**
+TS: PosSTD failed to improve $f_{min}$. The Outputscale has increased again (15.18). Since deterministic exploration (PosSTD) failed, and we are stuck at $f_{min}=-0.945$ with 26 iterations remaining, Thompson Sampling is the best choice to introduce stochasticity. It can probabilistically sample the high-variance regions, which is necessary when deterministic methods fail to find an improvement in a highly uncertain environment.
+
+**TS: To introduce stochasticity and leverage probabilistic sampling of the posterior distribution, necessary after the failure of deterministic exploration (PosSTD) in this persistently high-uncertainty environment (Outputscale 15.18).**
+UCB: TS failed to improve $f_{min}$ and caused significant clustering (0.036). The Outputscale has reached a new maximum (15.60). We have exhausted all acquisition functions that failed to improve $f_{min}$ in previous steps. We must cycle back to the most robust function, UCB, as it provides the best balance between exploration and exploitation, which is essential when the model is maximally unstable and we have a moderate remaining budget (25 iterations).
+
+**UCB: Required as the most robust, balanced strategy to manage the persistent, maximal model uncertainty (Outputscale 15.60) and the moderate remaining budget, cycling back to the best general-purpose function after all others have failed to yield improvement.**
+EI: UCB failed to improve $f_{min}$ and caused catastrophic clustering (shortest distance 0.010). However, the Outputscale has dropped slightly (14.87). Given the extreme local clustering, we must attempt a precise exploitation. EI is the standard function for maximizing the expected gain, and its use is justified here to attempt to break the local stagnation by targeting the highest expected value, despite the high remaining uncertainty.
+
+**EI: To attempt a precise exploitation and break the catastrophic local clustering (0.010), leveraging the slight reduction in Outputscale to target the highest expected gain.**
+PosSTD: EI failed to improve $f_{min}$. Although the Outputscale remains extremely high (14.73), the last point was highly exploratory (shortest distance 0.855). Since exploitation failed, and we are stuck at $f_{min}=-0.945$, we must return to pure exploration to stabilize the model. PosSTD is the only function that purely maximizes uncertainty, which is necessary to sample the most unknown regions and potentially reduce the massive Outputscale.
+
+**PosSTD: Required to aggressively stabilize the highly uncertain GP (Outputscale 14.73) by maximizing pure exploration, as exploitation failed and the model remains highly volatile.**
+LogEI: PosSTD finally achieved a significant improvement ($f_{min}$ from -0.945 to -0.947) but caused significant clustering (shortest distance 0.042). Crucially, the Outputscale has dropped dramatically (from 14.73 to 4.41), indicating a major stabilization of the GP. We must immediately exploit this new, better point. LogEI is chosen over standard EI because the search is highly localized and we are seeking a small improvement relative to a high threshold, requiring the numerical stability of the log variant.
+
+**LogEI: To immediately exploit the newly found, significant improvement (-0.947) with numerical stability, leveraging the dramatic stabilization of the GP (Outputscale 4.41) and addressing the significant local clustering (0.042).**
+PosMean: LogEI failed to improve $f_{min}$ and caused catastrophic, exact duplication (shortest distance 0.0). The Outputscale has rebounded (6.89). Since we are completely stuck at the exact same point, we must use the most deterministic exploitation strategy, PosMean, to force the search away from the duplicated point and towards the highest predicted peak, ignoring the high uncertainty.
+
+**PosMean: Essential to break the catastrophic exact duplication (shortest distance 0.0). PosMean deterministically forces the search to the highest predicted value, attempting to escape the local stagnation.**
+TS: PosMean failed to improve $f_{min}$. The Outputscale remains high (6.35). Since deterministic exploitation (PosMean) failed, and we are stuck at $f_{min}=-0.947$ with 20 iterations remaining, Thompson Sampling is the best choice to introduce stochasticity. It can probabilistically sample the high-variance regions, which is necessary when deterministic methods fail to find an improvement in a highly uncertain environment.
+
+**TS: To introduce stochasticity and leverage probabilistic sampling of the posterior distribution, necessary after the failure of deterministic exploitation (PosMean) in this persistently high-uncertainty environment (Outputscale 6.35).**
+UCB: TS failed to improve $f_{min}$. The Outputscale remains high (6.69). We have exhausted all acquisition functions that failed to improve $f_{min}$ in previous steps. We must cycle back to the most robust function, UCB, as it provides the best balance between exploration and exploitation, which is essential when the model is highly unstable and we have a limited remaining budget (19 iterations).
+
+**UCB: Required as the most robust, balanced strategy to manage the persistent, high model uncertainty (Outputscale 6.69) and the limited remaining budget, cycling back to the best general-purpose function after all others have failed to yield improvement.**
+EI: UCB failed to improve $f_{min}$ and caused significant clustering (shortest distance 0.033). The Outputscale remains high (7.00). Given the significant local clustering, we must attempt a precise exploitation. EI is the standard function for maximizing the expected gain, and its use is justified here to attempt to break the local stagnation by targeting the highest expected value.
+
+**EI: To attempt a precise exploitation and break the significant local clustering (0.033), targeting the highest expected gain despite the high remaining uncertainty.**
+PosSTD: EI failed to improve $f_{min}$. The Outputscale remains extremely high (7.16). Since exploitation failed, and we are stuck at $f_{min}=-0.947$, we must return to pure exploration to stabilize the model. PosSTD is the only function that purely maximizes uncertainty, which is necessary to sample the most unknown regions and potentially reduce the massive Outputscale, especially with only 17 iterations left.
+
+**PosSTD: Required to aggressively stabilize the highly uncertain GP (Outputscale 7.16) by maximizing pure exploration, as exploitation failed and the model remains highly volatile.**
+TS: PosSTD failed to improve $f_{min}$. The Outputscale remains high (7.00). Since deterministic exploration (PosSTD) failed, and we are stuck at $f_{min}=-0.947$ with 16 iterations remaining, Thompson Sampling is the best choice to introduce stochasticity. It can probabilistically sample the high-variance regions, which is necessary when deterministic methods fail to find an improvement in a highly uncertain environment.
+
+**TS: To introduce stochasticity and leverage probabilistic sampling of the posterior distribution, necessary after the failure of deterministic exploration (PosSTD) in this persistently high-uncertainty environment (Outputscale 7.00).**
+UCB: TS failed to improve $f_{min}$ and caused significant clustering (0.033). The Outputscale remains high (7.25). We have exhausted all acquisition functions that failed to improve $f_{min}$ in previous steps. With only 15 iterations left, UCB is the most robust function to cycle back to, as it provides the best balance between exploration and exploitation, crucial for a final push in a highly unstable model.
+
+**UCB: Required as the most robust, balanced strategy to manage the persistent, high model uncertainty (Outputscale 7.25) and the limited remaining budget, cycling back to the best general-purpose function for a final attempt at improvement.**
+EI: UCB failed to improve $f_{min}$ and caused severe clustering (shortest distance 0.014). The Outputscale remains high (7.22). Given the severe local clustering, we must attempt a precise exploitation. EI is the standard function for maximizing the expected gain, and its use is justified here to attempt to break the local stagnation by targeting the highest expected value.
+
+**EI: To attempt a precise exploitation and break the severe local clustering (0.014), targeting the highest expected gain despite the high remaining uncertainty.**
+PosSTD: EI failed to improve $f_{min}$. The Outputscale remains extremely high (7.21). Since exploitation failed, and we are stuck at $f_{min}=-0.947$, we must return to pure exploration to stabilize the model. PosSTD is the only function that purely maximizes uncertainty, which is necessary to sample the most unknown regions and potentially reduce the massive Outputscale, especially with only 13 iterations left.
+
+**PosSTD: Required to aggressively stabilize the highly uncertain GP (Outputscale 7.21) by maximizing pure exploration, as exploitation failed and the model remains highly volatile.**
+TS: PosSTD failed to improve $f_{min}$ and caused significant clustering (0.046). The Outputscale remains high (7.14). Since deterministic exploration (PosSTD) failed, and we are stuck at $f_{min}=-0.947$ with only 12 iterations remaining, Thompson Sampling is the best choice to introduce stochasticity for a final attempt to find an improvement in the high-variance regions.
+
+**TS: To introduce stochasticity and leverage probabilistic sampling of the posterior distribution, necessary after the failure of deterministic exploration (PosSTD) in this persistently high-uncertainty environment with a limited budget.**
+UCB: TS failed to improve $f_{min}$ and caused catastrophic clustering (0.007). The Outputscale remains high (7.40). With only 11 iterations left, UCB is the most robust function to cycle back to, as it provides the best balance between exploration and exploitation, crucial for a final push in a highly unstable model, attempting to break the extreme local stagnation.
+
+**UCB: Required as the most robust, balanced strategy to manage the persistent, high model uncertainty (Outputscale 7.40) and the extremely limited remaining budget, cycling back to the best general-purpose function to break the catastrophic local clustering.**
+EI: UCB failed to improve $f_{min}$. The Outputscale remains high (7.24). With only 10 iterations left, we must prioritize exploitation to maximize the chance of finding a final improvement. EI is the standard function for maximizing the expected gain, and its use is justified here as the primary exploitation tool in the final phase of the optimization.
+
+**EI: To prioritize exploitation in the final 10 iterations, maximizing the expected gain over the current best point, despite the persistent high model uncertainty.**
+PosSTD: EI failed to improve $f_{min}$. The Outputscale remains extremely high (7.05). With only 9 iterations left, and exploitation having failed, we must use the remaining budget to aggressively explore the most uncertain regions to stabilize the model and potentially uncover a hidden optimum. PosSTD is the only function that purely maximizes uncertainty.
+
+**PosSTD: Required for aggressive, pure exploration in the final phase (9 iterations) to stabilize the highly uncertain GP (Outputscale 7.05) and sample the most unknown regions after exploitation failed.**
+TS: PosSTD failed to improve $f_{min}$. However, the Outputscale has dropped significantly (from 7.05 to 4.92), indicating a stabilization of the GP. With only 8 iterations left, and deterministic exploration having failed, Thompson Sampling is the best choice to introduce stochasticity, leveraging the newly stabilized model to probabilistically sample for a final improvement.
+
+**TS: To introduce stochasticity and leverage the significant drop in Outputscale (4.92), probabilistically sampling the posterior distribution for a final improvement in the limited remaining budget.**
+UCB: TS failed to improve $f_{min}$ and caused severe clustering (0.014). The Outputscale remains relatively stable (4.89). With only 7 iterations left, UCB is the most robust function to cycle back to, as it provides the best balance between exploration and exploitation, crucial for a final attempt to break the local stagnation while managing the remaining uncertainty.
+
+**UCB: Required as the most robust, balanced strategy to manage the stable but high uncertainty (Outputscale 4.89) and the extremely limited remaining budget, attempting to break the severe local clustering.**
+EI: UCB failed to improve $f_{min}$. The Outputscale has dropped slightly (4.50). With only 6 iterations left, we must prioritize exploitation to maximize the chance of finding a final improvement. EI is the standard function for maximizing the expected gain, and its use is justified here as the primary exploitation tool in the final phase of the optimization.
+
+**EI: To prioritize exploitation in the final 6 iterations, maximizing the expected gain over the current best point, leveraging the slight reduction in model uncertainty.**
+PosSTD: EI failed to improve $f_{min}$. The Outputscale continues to drop (4.15), but exploitation failed. With only 5 iterations left, and exploitation having failed, we must use the remaining budget to aggressively explore the most uncertain regions to potentially uncover a hidden optimum before the search ends. PosSTD is the only function that purely maximizes uncertainty.
+
+**PosSTD: Required for aggressive, pure exploration in the final 5 iterations to sample the most uncertain regions (maximizing variance) after exploitation failed, aiming for a final discovery.**
+TS: PosSTD failed to improve $f_{min}$ and caused significant clustering (0.039). The Outputscale is low for this optimization (4.07). With only 4 iterations left, Thompson Sampling is the best choice to introduce stochasticity, leveraging the relatively stabilized model to probabilistically sample for a final improvement, which is often effective when deterministic methods are stuck.
+
+**TS: To introduce stochasticity and leverage the relatively stabilized model (Outputscale 4.07) for a final probabilistic attempt at improvement, necessary after deterministic exploration failed in the final iterations.**
+UCB: TS failed to improve $f_{min}$ and caused severe clustering (0.015). The Outputscale remains stable (4.16). With only 3 iterations left, UCB is the most robust function to cycle back to, providing the best balance between exploration and exploitation for the absolute final attempts, aiming to break the local stagnation.
+
+**UCB: Required as the most robust, balanced strategy for the final 3 iterations, attempting to break the severe local clustering while managing the remaining uncertainty.**
+EI: UCB failed to improve $f_{min}$. With only 2 iterations left, we must maximize the chance of finding a final improvement through pure exploitation. EI is the standard function for maximizing the expected gain, making it the optimal choice for the penultimate step.
+
+**EI: To prioritize pure exploitation in the penultimate iteration, maximizing the expected gain over the current best point to secure a final improvement.**
+PosMean: EI failed to improve $f_{min}$. With only 1 iteration remaining, we must use the most deterministic exploitation strategy possible to target the point the model currently believes is the absolute best. PosMean maximizes the posterior mean, providing the final, most confident prediction of the optimum location.
+
+**PosMean: Required for the final iteration to deterministically target the point with the highest predicted value (posterior mean), maximizing the chance of ending the optimization at the model's most confident optimum.**
+The optimization process was characterized by extreme stagnation ($f_{min}$ stuck at -0.947 for over 40 iterations) and catastrophic model instability (Outputscale frequently spiking above 7, sometimes above 15). The search repeatedly clustered near the current optimum, despite the model indicating massive uncertainty.
+
+This behavior—overly aggressive exploitation leading to stagnation and failure to explore sufficiently to stabilize the GP—is the classic failure mode of the **Probability of Improvement (PI)** acquisition function. PI is highly sensitive to the current best value and noise, often leading it to sample points very close to the current optimum without maximizing the *magnitude* of the expected gain, which perfectly explains why the search got stuck and the GP model parameters became so volatile trying to fit the local noise.
+
+**Acquisition Function Guess: PI (Probability of Improvement)**

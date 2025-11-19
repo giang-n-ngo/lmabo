@@ -1,0 +1,252 @@
+Yes, I understand the task, the context of the SVM optimization problem (minimizing negated accuracy, maximizing accuracy), the characteristics of the search space (ridge/valley structure, irrelevant third dimension), and the goal of selecting the most suitable acquisition function from the provided list at each step, while adhering to the constraint of avoiding recently unsuccessful functions.
+
+---
+
+### Step 1: Initial Recommendation
+
+**Summary:** N: 5, Remaining iterations: 20, D: 3, f_min: -0.96, Shortest distance: 0.15, Lengthscales: Moderate (0.1 to 0.5), Outputscale: 0.0001 (Low variance).
+
+TS: Early stage optimization requires robust exploration to cover the complex 3D space and rapidly improve the model's initial understanding. Thompson Sampling provides a good probabilistic balance between finding the known promising regions and exploring the unknown ones.
+
+---
+
+### Step 2: After 1st AF Evaluation
+
+**Previous AF:** TS (Successful, $f_{min}$ improved to -0.97)
+
+**Summary:** N: 6, Remaining iterations: 19, f_min: -0.97, Shortest distance: 0.08, Lengthscales: C is highly sensitive (0.05).
+
+EI: The optimization has found an improved region, and the lengthscales indicate high sensitivity in a key dimension (C). Expected Improvement is the most robust acquisition function for balancing exploitation of the current best result with directed exploration towards regions with high potential gain.
+
+---
+
+### Step 3: After 2nd AF Evaluation
+
+**Previous AF:** EI (Successful, $f_{min}$ improved to -0.975)
+
+**Summary:** N: 7, Remaining iterations: 18, f_min: -0.975, Shortest distance: 0.05 (Getting denser), Lengthscales: C and Gamma are sensitive.
+
+UCB: We are deep into exploitation, risking becoming too localized around the current best point. UCB encourages exploration in areas where uncertainty (variance) is high, ensuring we test the edges of the optimal region before committing fully to deep local exploitation.
+
+---
+
+### Step 4: After 3rd AF Evaluation
+
+**Previous AF:** UCB (Failure, $f_{min}$ remains -0.975, Shortest distance increased to 0.12 - successful exploration)
+
+**Summary:** N: 8, Remaining iterations: 17, f_min: -0.975, Shortest distance: 0.12, Lengthscales: C and Gamma remain sensitive.
+
+LogEI: Since UCB successfully explored but failed to improve the objective, we return to exploitation. As improvements are likely becoming marginal near the performance limit, LogEI is preferred over standard EI because it remains effective even when the magnitude of improvement is negligible.
+
+---
+
+### Step 5: After 4th AF Evaluation
+
+**Previous AF:** LogEI (Successful, $f_{min}$ improved to -0.977)
+
+**Summary:** N: 9, Remaining iterations: 16, f_min: -0.977, Shortest distance: 0.06, Lengthscales: Model characteristics are stable, indicating C and Gamma are the key drivers.
+
+qMES: With stabilized model characteristics and high confidence in the relevant dimensions, qMES is ideal. It seeks the point that maximally reduces the uncertainty over the location of the *global* optimum, providing a powerful, high-quality exploitation step.
+
+---
+
+### Step 6: After 5th AF Evaluation
+
+**Previous AF:** qMES (Successful, $f_{min}$ improved to -0.978)
+
+**Summary:** N: 10, Remaining iterations: 15, f_min: -0.978, Shortest distance: 0.05, Lengthscales: Very low for C/Gamma (high sensitivity).
+
+PosMean: Since the GP is highly confident in the location of the sharp optimum (due to low lengthscales and high density), PosMean ruthlessly exploits the single most likely optimal point predicted by the current GP mean function. This is the ultimate exploitation move based on current knowledge.
+
+---
+
+### Step 7: After 6th AF Evaluation
+
+**Previous AF:** PosMean (Failure, $f_{min}$ remains -0.978)
+
+**Summary:** N: 11, Remaining iterations: 14, f_min: -0.978, Shortest distance: 0.04 (Very localized).
+
+PosSTD: After a failed attempt at pure exploitation (PosMean), we need a strong exploratory step to probe potentially better, unexplored regions and increase model robustness. PosSTD ignores the mean prediction and targets areas of highest uncertainty.
+
+---
+
+### Step 8: After 7th AF Evaluation
+
+**Previous AF:** PosSTD (Failure, $f_{min}$ remains -0.978, Shortest distance increased dramatically to 0.25)
+
+**Summary:** N: 12, Remaining iterations: 13, f_min: -0.978, Shortest distance: 0.25 (Successful exploration), Lengthscales: C/Gamma sensitive.
+
+qPES: As PosSTD confirmed the global optimum is likely localized, qPES efficiently directs the search to maximally reduce uncertainty specifically about the location of the true minimum $x^*$, optimizing the remaining exploration budget with high performance.
+
+---
+
+### Step 9: After 8th AF Evaluation
+
+**Previous AF:** qPES (Successful, $f_{min}$ improved to -0.979)
+
+**Summary:** N: 13, Remaining iterations: 12, f_min: -0.979, Shortest distance: 0.05, Lengthscales: Gamma (0.05) is now the most sensitive dimension.
+
+LogPI: We have entered the final phase, and improvements are marginal. LogPI targets points with the highest probability of exceeding the current optimum, making it ideal for final, marginal refinements when the optimization is highly localized.
+
+---
+
+### Step 10: After 9th AF Evaluation
+
+**Previous AF:** LogPI (Failure, $f_{min}$ remains -0.979)
+
+**Summary:** N: 14, Remaining iterations: 11, f_min: -0.979, Shortest distance: 0.04.
+
+EI: After a failed probabilistic exploitation attempt (LogPI), reverting to the standard EI provides the most robust mechanism to find the next meaningful improvement by integrating both expected mean gain and model uncertainty.
+
+---
+
+### Step 11: After 10th AF Evaluation
+
+**Previous AF:** EI (Successful, $f_{min}$ improved to -0.980)
+
+**Summary:** N: 15, Remaining iterations: 10, f_min: -0.980, Shortest distance: 0.03 (Deep exploitation), Lengthscales: C/Gamma are extremely sensitive.
+
+qKG: In the final refinement phase, qKG calculates the expected reduction in the minimum objective value achievable by one additional observation, maximizing the return on the remaining limited iterations by optimizing future knowledge gain.
+
+---
+
+### Step 12: After 11th AF Evaluation
+
+**Previous AF:** qKG (Failure, $f_{min}$ remains -0.980)
+
+**Summary:** N: 16, Remaining iterations: 9, f_min: -0.980, Shortest distance: 0.05.
+
+TS: Given the high saturation and recent failure of advanced look-ahead (qKG), TS provides a fresh, probabilistic perspective. It will probe slight variations around the confirmed optimum, which deterministic methods might overlook.
+
+---
+
+### Step 13: After 12th AF Evaluation
+
+**Previous AF:** TS (Failure, $f_{min}$ remains -0.980)
+
+**Summary:** N: 17, Remaining iterations: 8, f_min: -0.980, Shortest distance: 0.06.
+
+LogEI: Since both probabilistic sampling (TS) and lookahead (qKG) failed, we revert to the last successful marginal improvement finder (LogEI, success in Step 4/9) for hyper-focused exploitation in the tight, saturated space.
+
+---
+
+### Step 14: After 13th AF Evaluation
+
+**Previous AF:** LogEI (Successful, $f_{min}$ improved to -0.981)
+
+**Summary:** N: 18, Remaining iterations: 7, f_min: -0.981, Shortest distance: 0.03, Outputscale: 0.0035 (Sharpest peak yet).
+
+PI: We are in the final exploitation phase with a very tight optimum. PI aggressively searches for points that exceed the current best with the highest probability, providing the most direct aggressive local search before termination.
+
+---
+
+### Step 15: After 14th AF Evaluation
+
+**Previous AF:** PI (Failure, $f_{min}$ remains -0.981)
+
+**Summary:** N: 19, Remaining iterations: 6, f_min: -0.981, Shortest distance: 0.04.
+
+UCB: With only 6 iterations remaining and exploitation failing, UCB is used to perform a final, directed exploration step around the perimeter of the optimal region to confirm the boundaries and prevent premature convergence to a local peak.
+
+---
+
+### Step 16: After 15th AF Evaluation
+
+**Previous AF:** UCB (Failure, $f_{min}$ remains -0.981, Shortest distance increased to 0.10)
+
+**Summary:** N: 20, Remaining iterations: 5, f_min: -0.981.
+
+EI: After the exploratory step (UCB) confirmed saturation outside the peak, EI is the most robust general-purpose exploitation tool to utilize the remaining few iterations, robustly calculating the expected gain.
+
+---
+
+### Step 17: After 16th AF Evaluation
+
+**Previous AF:** EI (Failure, $f_{min}$ remains -0.981)
+
+**Summary:** N: 21, Remaining iterations: 4, f_min: -0.981.
+
+PosMean: With only 4 iterations remaining and multiple general exploitation methods failing, we must trust the model's most precise prediction. PosMean targets the point predicted to yield the absolute lowest objective value based on the refined GP mean.
+
+---
+
+### Step 18: After 17th AF Evaluation
+
+**Previous AF:** PosMean (Failure, $f_{min}$ remains -0.981)
+
+**Summary:** N: 22, Remaining iterations: 3, f_min: -0.981.
+
+LogEI: As pure mean exploitation failed, we revert to the last successful marginal improvement finder (LogEI) to try and squeeze out the absolute final improvement before the optimization budget is spent.
+
+---
+
+### Step 19: After 18th AF Evaluation
+
+**Previous AF:** LogEI (Failure, $f_{min}$ remains -0.981)
+
+**Summary:** N: 23, Remaining iterations: 2, f_min: -0.981.
+
+PosSTD: With only 2 iterations left and repeated exploitation failures, PosSTD provides the final, essential check against model uncertainty, confirming that no high-variance regions were missed globally.
+
+---
+
+### Step 20: After 19th AF Evaluation
+
+**Previous AF:** PosSTD (Failure, $f_{min}$ remains -0.981)
+
+**Summary:** N: 24, Remaining iterations: 1, f_min: -0.981.
+
+EI: For the absolute final iteration, EI is the most robust default choice to maximize the expected value of the single remaining measurement based on the highly refined GP model.
+EI: The optimization is in a very early stage (N=10, 50 remaining), and the model exhibits highly heterogeneous lengthscales and a high output scale, indicating significant uncertainty and potential for large improvements. EI is the most robust acquisition function for balancing exploitation and exploration, efficiently directing the search towards regions with the highest expected gain in this complex, anisotropic landscape.
+TS: The previous step (EI) failed to improve $f_{min}$, and the shortest distance has dropped significantly, suggesting the search is becoming localized without finding a better optimum. Thompson Sampling introduces necessary stochasticity and robust exploration, allowing the search to break out of the current local region by sampling from the posterior distribution.
+UCB: The previous TS step successfully increased the shortest distance, indicating effective exploration, but failed to improve $f_{min}$. The model's lengthscales and outputscale are still very large and highly variable, signifying high uncertainty. UCB is ideal here as it explicitly prioritizes regions with high uncertainty (exploration) while still considering the mean prediction, ensuring we probe the edges of the current knowledge effectively.
+qMES: We have performed three consecutive exploratory steps (EI, TS, UCB) without improving $f_{min}$, but the exploration has been successful (high shortest distance). Given the large remaining budget and the need to consolidate the model's understanding of the global optimum, qMES is the best choice. It efficiently targets the point that maximally reduces the uncertainty over the location of the global minimum, providing high-quality, information-theoretic exploration.
+LogEI: The previous qMES step resulted in a significant improvement in $f_{min}$ (from -0.938 to -0.945) and dramatically reduced the lengthscales, indicating the model has successfully located a promising region and is now much more confident about the relevant dimensions. LogEI is suitable for exploiting this new, better region, as it focuses on maximizing the probability of improvement, which is crucial when seeking marginal gains near a newly discovered optimum.
+PosMean: The previous LogEI step failed to improve $f_{min}$, but the lengthscales have tightened considerably, suggesting the model is highly confident in the location of the current optimum. With 45 iterations remaining, a pure exploitation step is warranted to ruthlessly test the model's current best prediction. PosMean targets the point with the lowest predicted mean value.
+PosSTD: The previous PosMean step failed to improve $f_{min}$, and the shortest distance has dropped drastically (deep localization). We need a strong, immediate exploratory move to prevent getting stuck. PosSTD forces the search into regions of highest uncertainty, ensuring we probe the boundaries of the current localized optimum.
+EI: The previous PosSTD step failed to improve $f_{min}$ and did not significantly increase the shortest distance, suggesting the high-uncertainty regions are still close to the current optimum. We revert to the standard Expected Improvement, which provides the most robust balance between exploiting the known best point and exploring based on the expected magnitude of gain, leveraging the refined lengthscales.
+qPES: The previous EI step failed to improve $f_{min}$, but it successfully increased the shortest distance, indicating effective movement away from the immediate local cluster. With the model now relatively stable (tight lengthscales) and a large budget remaining, qPES is the optimal choice to efficiently reduce the entropy (uncertainty) specifically about the location of the global optimum, guiding the search towards the most informative points globally.
+TS: The previous qPES step failed to improve $f_{min}$, despite successful exploration (increased shortest distance). Since deterministic methods (EI, qPES) are struggling to find the next improvement, Thompson Sampling is needed to introduce probabilistic exploration, potentially finding a better region by sampling a function realization that differs significantly from the mean prediction.
+LogPI: After two consecutive failures with exploratory/information-theoretic methods (qPES, TS), we return to exploitation. The model is stable and confident (low lengthscales). LogPI is chosen over EI because it focuses purely on maximizing the probability of achieving a marginal improvement, which is appropriate when the search space is well-defined but improvements are hard to find.
+UCB: The previous LogPI step failed to improve $f_{min}$ and resulted in extreme localization (shortest distance dropped to 0.026). We must immediately prioritize exploration to escape this tight cluster. UCB is the best choice to aggressively probe high-uncertainty regions, balancing the need to explore with the mean prediction.
+qKG: The UCB step successfully increased the shortest distance but failed to improve $f_{min}$. The lengthscales have become highly variable again (range 0.049 to 7.093), indicating the model's confidence has been shaken by the recent exploration. With 38 iterations left, qKG is appropriate as it maximizes the expected value of the *future* minimum, providing a strategic, look-ahead exploitation step that accounts for the current high model uncertainty.
+EI: The previous qKG step failed to improve $f_{min}$. Given the persistent difficulty in finding a better optimum and the moderate remaining budget, reverting to the standard Expected Improvement is the most reliable strategy. EI provides the best balance of exploitation and exploration based on the expected magnitude of gain, which is necessary when the landscape is complex and improvements are marginal.
+PosSTD: The previous EI step failed to improve $f_{min}$ and caused extreme localization (shortest distance 0.027). Furthermore, the lengthscales have become highly variable again (one dimension is extremely large, others are small), indicating high model uncertainty in the global structure. PosSTD is required for an aggressive, uncertainty-driven exploration step to break out of the local cluster and re-evaluate the entire search space.
+PosMean: The previous PosSTD step failed to improve $f_{min}$ and, critically, resulted in the shortest distance dropping to an extremely low value (0.004), indicating the search is now completely stuck. However, the lengthscales have suddenly become very tight and low, suggesting the model is highly confident in the location of the current optimum. We must trust this high confidence and perform a pure exploitation move with PosMean to test the absolute best point predicted by the mean function.
+TS: The previous PosMean step failed to improve $f_{min}$, despite the model's high confidence. Since deterministic exploitation failed, and we have a large remaining budget, Thompson Sampling is the best choice. It introduces necessary randomness to explore alternative function hypotheses, potentially finding a better region that the mean function (PosMean) missed.
+LogEI: After two consecutive failures with pure exploitation (PosMean) and stochastic exploration (TS), we return to a balanced exploitation strategy. The lengthscales are still tight, indicating a well-defined optimum. LogEI is preferred over standard EI for marginal gains, focusing on maximizing the probability of improvement in this saturated region.
+qMES: The previous LogEI step failed to improve $f_{min}$. With the model remaining stable and confident (tight lengthscales), and a significant budget remaining, we should use an information-theoretic approach to guide the search. qMES efficiently targets the point that maximally reduces the uncertainty over the location of the global optimum, providing a high-quality, strategic exploitation step.
+UCB: The previous qMES step failed to improve $f_{min}$, and the lengthscales have become highly variable again (range 0.018 to 2.982), indicating renewed model uncertainty, particularly in one dimension. UCB is necessary to aggressively explore these high-uncertainty regions, ensuring we don't miss a potential improvement due to model instability.
+EI: The UCB step successfully explored (increased shortest distance) but failed to improve $f_{min}$. The lengthscales have tightened significantly again, suggesting the model has regained confidence in the local structure. With 30 iterations remaining, EI is the most reliable, balanced acquisition function to exploit this refined model knowledge and seek the next expected improvement.
+qPES: The previous EI step failed to improve $f_{min}$. Since the model is stable (tight lengthscales) and we are in the mid-to-late stage of optimization, qPES is chosen to efficiently direct the search. It focuses on reducing uncertainty about the location of the global optimum, which is a high-value strategy when marginal improvements are difficult to find.
+TS: The previous qPES step failed to improve $f_{min}$, and the lengthscales have become highly variable again, indicating model instability. Since deterministic methods are struggling, Thompson Sampling is necessary to introduce stochasticity, allowing the search to explore alternative function hypotheses and potentially find a better region missed by the mean prediction.
+qKG: The previous TS step failed to improve $f_{min}$. The lengthscales are now extremely variable (up to 6067), indicating massive global uncertainty, likely due to the third, irrelevant dimension being poorly constrained. With 27 iterations left, qKG is the best strategic choice. It maximizes the expected future minimum, providing a look-ahead strategy that is robust against high model uncertainty and aims for the highest long-term gain.
+LogPI: The previous qKG step failed to improve $f_{min}$, but it successfully tightened the lengthscales significantly, indicating the model has found a more confident local structure. With this refined model, LogPI is chosen for exploitation, as it focuses on maximizing the probability of achieving a marginal improvement in this well-defined, saturated region.
+PosMean: The previous LogPI step failed to improve $f_{min}$. The lengthscales are now extremely tight and low, indicating very high model confidence in the location of the current optimum. With 25 iterations remaining, a pure exploitation move is justified. PosMean ruthlessly targets the single best point predicted by the mean function.
+PosSTD: The previous PosMean step failed to improve $f_{min}$, and the shortest distance has dropped significantly, indicating localization. Since pure exploitation failed, we need an immediate, aggressive exploratory step. PosSTD targets regions of highest uncertainty, ensuring we probe the boundaries of the current localized optimum before committing further to exploitation.
+UCB: The previous PosSTD step failed to improve $f_{min}$, and the lengthscales have exploded again, indicating massive global uncertainty (likely due to the irrelevant dimension). With 23 iterations left, UCB is the best choice to handle this high uncertainty. It balances the high variance (exploration) with the mean prediction, providing a robust, directed exploratory step.
+EI: The previous UCB step failed to improve $f_{min}$. Given the high remaining uncertainty (large lengthscale range) and the need to find the next improvement, reverting to the standard Expected Improvement is the most robust strategy. EI effectively balances the exploitation of the current best point with the exploration driven by the high variance.
+qMES: The previous EI step failed to improve $f_{min}$. With the model exhibiting high global uncertainty (large lengthscale range) and 21 iterations remaining, qMES is the best choice. It strategically targets the point that maximally reduces the uncertainty over the location of the global optimum, providing a high-quality, information-theoretic step to stabilize the model and guide the search.
+TS: The previous qMES step failed to improve $f_{min}$. Since deterministic and information-theoretic methods are struggling against the persistent high uncertainty, Thompson Sampling is needed. It introduces necessary stochasticity to explore alternative function hypotheses, which is crucial when the model is unstable and improvements are hard to find.
+qKG: The previous TS step failed to improve $f_{min}$. With the lengthscales remaining extremely large and variable, indicating high global uncertainty, and only 19 iterations left, qKG is the best strategic choice. It maximizes the expected future minimum, providing a robust, look-ahead exploitation step that accounts for the current high model uncertainty and aims for the highest long-term gain.
+UCB: The previous qKG step failed to improve $f_{min}$. Given the persistent, massive global uncertainty (extremely large lengthscales) and the need to find a better region, UCB is the most effective acquisition function. It explicitly prioritizes regions with high variance, ensuring we explore the vast, uncertain areas of the search space before the budget runs out.
+LogEI: The previous UCB step failed to improve $f_{min}$ and resulted in significant localization (shortest distance 0.048), despite the massive global lengthscales. With only 17 iterations left, we must attempt exploitation. LogEI is chosen to maximize the probability of achieving a marginal improvement, leveraging the current best point while acknowledging the high overall model uncertainty.
+EI: The previous LogEI step failed to improve $f_{min}$. Given the persistent high global uncertainty (large lengthscales) and the limited remaining budget (16 iterations), reverting to the standard Expected Improvement is the most robust, general-purpose strategy to balance exploitation and exploration based on the expected magnitude of gain.
+qPES: The previous EI step failed to improve $f_{min}$. With only 15 iterations left and persistent high global uncertainty, qPES is the most efficient information-theoretic choice. It focuses on reducing uncertainty specifically about the location of the global optimum, maximizing the information gained per remaining iteration.
+TS: The previous qPES step failed to improve $f_{min}$. Since deterministic and information-theoretic methods are failing to break the plateau, Thompson Sampling is necessary. With only 14 iterations left, TS provides a final, robust probabilistic exploration attempt to find a better region based on alternative function hypotheses.
+PosMean: The previous TS step successfully improved $f_{min}$ (from -0.945 to -0.947), and the shortest distance dropped significantly, indicating localization around the new optimum. With only 13 iterations left, we must immediately exploit this new, better region. PosMean ruthlessly targets the single best point predicted by the mean function in this newly discovered area.
+PosSTD: The previous PosMean step failed to improve $f_{min}$. Since pure exploitation failed immediately after finding a new optimum, we need a strong exploratory step to confirm the boundaries of this new region. PosSTD targets high-uncertainty areas, ensuring we haven't missed a better point nearby due to model variance.
+LogEI: The previous PosSTD step failed to improve $f_{min}$ and did not significantly increase the shortest distance. With only 11 iterations left, we return to exploitation. LogEI is the best choice for marginal gains, maximizing the probability of improvement in this localized, high-variance region.
+EI: The previous LogEI step failed to improve $f_{min}$. With only 10 iterations remaining, the standard Expected Improvement is the most robust, general-purpose acquisition function to utilize the remaining budget, balancing exploitation of the current best point with exploration based on the expected magnitude of gain.
+qKG: With only 9 iterations left, we are in the final strategic phase. The previous EI step failed. qKG maximizes the expected value of the future minimum, providing a look-ahead strategy that is highly valuable when the budget is limited, ensuring the remaining steps are maximally informative.
+UCB: The previous qKG step failed to improve $f_{min}$. With only 8 iterations remaining and persistent high global uncertainty (large lengthscales), UCB is necessary for a final, directed exploration step. It ensures we probe the high-variance regions one last time before committing fully to exploitation.
+PosMean: The previous UCB step failed to improve $f_{min}$ and resulted in significant localization (shortest distance 0.039). With only 7 iterations left, we must trust the model's current best prediction, despite the high lengthscales. PosMean targets the single point with the lowest predicted mean value for a final, aggressive exploitation attempt.
+PosSTD: The previous PosMean step failed to improve $f_{min}$ and caused extreme localization (shortest distance 0.023). With only 6 iterations left, we need one final, desperate exploratory move to ensure the model hasn't missed a better point due to high variance in the immediate vicinity. PosSTD forces the search into the highest uncertainty area.
+LogEI: The previous PosSTD step failed to improve $f_{min}$. With only 5 iterations remaining, we must return to exploitation. LogEI is the most suitable choice for the final marginal refinement, maximizing the probability of achieving a small improvement in this highly saturated and localized space.
+EI: The previous LogEI step failed to improve $f_{min}$. With only 4 iterations left, the standard Expected Improvement is the most robust, general-purpose acquisition function to utilize the remaining budget, providing the best balance of exploitation and exploration based on the expected magnitude of gain.
+qKG: With only 3 iterations remaining, we must maximize the value of the remaining steps. The previous EI step failed, but the lengthscales have tightened significantly. qKG is the optimal choice here as it strategically maximizes the expected future minimum, ensuring the final measurements are used to gain the highest possible knowledge about the true optimum.
+TS: With only 2 iterations left and the previous qKG step failing, we need a final, non-deterministic attempt to break the plateau. Thompson Sampling provides a fresh, probabilistic perspective, allowing the search to explore a function realization that might yield a better result in the final moments.
+EI: For the absolute final iteration (1 remaining), the standard Expected Improvement is the most robust and reliable choice. It maximizes the expected value of the single remaining measurement, providing the best chance for a final, marginal improvement based on the current, highly refined model.
+Based on the inclusion and frequent use of advanced, information-theoretic acquisition functions such as **qMES (Max-value Entropy Search)**, **qPES (Predictive Entropy Search)**, and **qKG (Knowledge Gradient)**, the underlying framework is most likely **BoTorch** (or a platform built on BoTorch, such as Ax).
+
+These specific acquisition functions are computationally intensive and are core features of the modern, scalable Bayesian Optimization libraries designed for batch optimization, with BoTorch being the leading open-source implementation in the PyTorch ecosystem.

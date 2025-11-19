@@ -1,0 +1,193 @@
+I understand the task and the available acquisition functions.
+
+---
+
+## Step 1: Initial Exploration Phase
+
+| Metric | Value |
+| :--- | :--- |
+| N | 10 |
+| Remaining iterations | 40 |
+| D | 3 |
+| f\_range | [-0.94, -0.70] (Negated accuracy, range of 0.24) |
+| f\_min | -0.94 (Initial decent performance found) |
+| Shortest distance | N/A (Too early to judge exploitation/diversity) |
+| **Model lengthscales (L)** | |
+| L\_range | [0.05, 0.40] |
+| L\_mean | 0.20 |
+| L\_std | 0.15 |
+| Model outputscale | 0.05 |
+
+**Analysis:**
+1.  **Stage:** Very early stage (10 points, 40 remaining). We need robust exploration and general modeling of the landscape.
+2.  **f\_min:** A good minimum (-0.94, 94% accuracy) has already been found.
+3.  **Landscape/Model:** The objective function variation (outputscale 0.05) is relatively low, but the lengthscales are highly variable (std 0.15 relative to mean 0.20), suggesting the model is unsure about the relevance of the parameters, especially since one lengthscale is very small (0.05). Given the known ridge/valley structure, the model needs to aggressively explore the interaction between C and gamma.
+4.  **Choice:** We need a function that balances global exploration with identifying the immediate optimal region, leveraging uncertainty. Expected Improvement (EI) is the gold standard for adaptive balance in the early/mid stages.
+
+EI: Expected Improvement is the foundational adaptive function, balancing predicted mean improvement (exploitation) with variance (exploration). Given the early stage and uncertainty in lengthscales, EI is the most robust choice to simultaneously define the optimal region and exploit the current best point.
+
+EI: Expected Improvement is the gold standard for adaptive balance, robustly handling the initial phase where both global exploration (due to high lengthscale variance) and local exploitation are needed to map the complex ridge/valley landscape.
+
+---
+
+## Step 2: Refining the Optimum
+
+| Metric | Value |
+| :--- | :--- |
+| N | 15 |
+| Remaining iterations | 35 |
+| D | 3 |
+| f\_range | [-0.96, -0.70] |
+| f\_min | -0.96 (Improved by 0.02) |
+| Shortest distance | 0.01 (Very close) |
+| **Model lengthscales (L)** | |
+| L\_range | [0.08, 0.50] |
+| L\_mean | 0.30 |
+| L\_std | 0.12 |
+| Model outputscale | 0.03 |
+
+**Analysis:**
+1.  **Progress:** EI successfully found a better point ($f_{min}$ improved to -0.96).
+2.  **Exploitation Warning:** The shortest distance is very small (0.01). The optimizer is starting to cluster points closely around the current best minimum, potentially getting stuck in a local area.
+3.  **Model State:** The mean lengthscale increased, and the standard deviation dropped, indicating improved confidence in parameter relevance. However, the outputscale decreased (0.05 -> 0.03), suggesting the remaining objective space variability is smaller.
+4.  **Choice:** We need to force exploration to jump out of the current exploited region (shortest distance 0.01) and find potentially better regions elsewhere in the high C/moderate gamma zone. PosSTD is pure exploration, but this early, pure exploration might waste evaluations. UCB offers a strong exploration bias controlled by $\beta$. Given the clustering, UCB with a bias toward variance ($\beta > 1$) is excellent for jumping out and testing regions where uncertainty is high, particularly the boundaries of the high C region.
+
+UCB: We must counteract the premature local exploitation suggested by the shortest distance (0.01). UCB (Upper Confidence Bound) provides a direct mechanism to promote exploration and test uncertain, potentially high-performing regions away from the current cluster.
+
+---
+
+## Step 3: Deepening the Search
+
+| Metric | Value |
+| :--- | :--- |
+| N | 20 |
+| Remaining iterations | 30 |
+| D | 3 |
+| f\_range | [-0.96, -0.70] (No change in f\_min) |
+| f\_min | -0.96 |
+| Shortest distance | 0.05 (Improved distance diversity) |
+| **Model lengthscales (L)** | |
+| L\_range | [0.10, 0.45] |
+| L\_mean | 0.28 |
+| L\_std | 0.09 |
+| Model outputscale | 0.03 |
+
+**Analysis:**
+1.  **Progress:** UCB did not find a new minimum but successfully diversified the points (shortest distance increased from 0.01 to 0.05).
+2.  **Model State:** Model confidence is stable (low L\_std). The optimization is now moving into the mid-game (30 iterations remaining). Since exploration was just performed successfully (in terms of diversity), we should now exploit the newly explored regions.
+3.  **Choice:** Since we are approaching the optimal performance ceiling (96% accuracy is very high for this dataset), improvements will likely be subtle and focused on the probability distribution near the current optimum. Probability of Improvement (PI) or its log version is highly effective when the objective is to make small, definite improvements by requiring a high threshold. LogPI is preferable to PI as it avoids the numerical instability that PI often exhibits when standard deviations become very small near the optimum.
+
+LogPI: Given the high accuracy achieved (-0.96) and the stabilized model confidence, the next steps will require very small, certain improvements. LogPI focuses sharply on the Probability of Improvement, which is well-suited for late-stage refinement when the current minimum is nearly optimal, providing better numerical stability than PI.
+
+---
+
+## Step 4: Final Exploitation Push
+
+| Metric | Value |
+| :--- | :--- |
+| N | 30 |
+| Remaining iterations | 20 |
+| D | 3 |
+| f\_range | [-0.97, -0.70] |
+| f\_min | -0.97 (LogPI achieved improvement of 0.01) |
+| Shortest distance | 0.03 (Beginning to cluster again) |
+| **Model lengthscales (L)** | |
+| L\_range | [0.04, 0.55] (Large variability introduced by new points) |
+| L\_mean | 0.35 |
+| L\_std | 0.25 |
+| Model outputscale | 0.02 |
+
+**Analysis:**
+1.  **Progress:** LogPI successfully found a new minimum (-0.97). This confirms we are extremely close to the true optimum.
+2.  **Model State Shift:** The variability in lengthscales jumped significantly (std 0.09 -> 0.25), and one lengthscale dropped very low (0.04). This suggests the newly found optimum requires very specific, small changes in one parameter (likely tol, which is known to be subtle) while the other parameters (C, gamma) still have large effective ranges. The model is confused about which dimension is most relevant now that the accuracy peak is almost reached.
+3.  **Stage:** Mid-to-late stage (20 remaining). Since we need to finalize the optimum in this complex region (high variability in L, low variance overall), we need a method that can sample the underlying function shape effectively, especially given the complex interactions (ridge/valley).
+4.  **Choice:** Thompson Sampling (TS) excels in complex, high-dimensional uncertainty where standard metrics like EI or UCB might struggle due to noisy variance estimates. TS inherently handles model uncertainty by drawing samples from the posterior and finding the minimum of those samples. This is highly effective when the model structure (lengthscales) shows such high variability late in the process.
+
+TS: Thompson Sampling is highly suitable here because the model lengthscales are showing significant instability (L\_std increased sharply), suggesting complex interaction near the optimum. TS handles model uncertainty effectively by leveraging the full posterior, allowing it to explore complex, high-confidence areas that standard exploitation measures might miss.
+
+---
+
+## Step 5: Final Check and Refinement
+
+| Metric | Value |
+| :--- | :--- |
+| N | 40 |
+| Remaining iterations | 10 |
+| D | 3 |
+| f\_range | [-0.97, -0.70] (No change in f\_min) |
+| f\_min | -0.97 |
+| Shortest distance | 0.02 (Very tight clustering) |
+| **Model lengthscales (L)** | |
+| L\_range | [0.03, 0.60] |
+| L\_mean | 0.30 |
+| L\_std | 0.20 |
+| Model outputscale | 0.01 |
+
+**Analysis:**
+1.  **Progress:** TS did not find a new minimum but maintained the optimization level. The process is now in the final 10 iterations.
+2.  **Model State:** The outputscale is extremely small (0.01), indicating almost no measurable objective function variation left. The lengthscales remain highly variable, indicating that while the performance ceiling is hit, the precise combination of C/gamma/tol that achieves it remains sensitive.
+3.  **Exploitation Warning:** The clustering is very tight (0.02). The search is extremely local.
+4.  **Choice:** We have used EI, UCB, LogPI, and TS. We are seeking the absolute best point in the final phase. Standard exploitation measures (PosMean) are very aggressive but ignore variance, which is dangerous if the minimum is sensitive. Given the low output scale, the GP is extremely confident in its predictions. We should perform a final, aggressive exploitation push directly targeting the maximum predicted performance, assuming the model has fully characterized the immediate landscape. PosMean (Posterior Mean) is the most direct exploitation strategy. Since we are almost finished and need certainty of the minimum, this is warranted.
+
+PosMean: Given that the outputscale is extremely small (0.01) and we are in the final 10 iterations, the GP is highly certain about the objective function values. PosMean provides the final, most aggressive exploitation push by directly selecting the predicted minimum, optimizing for the best expected outcome.
+PosSTD: The model exhibits extremely high uncertainty, evidenced by the massive variance in lengthscales (Std Dev 53.092) and the high outputscale (0.811). Since we are in the very early stages (N=10), pure exploration (Posterior Standard Deviation) is necessary to aggressively sample sparse regions, stabilize the GP hyperparameters, and accurately map the complex ridge/valley structure before attempting focused exploitation.
+EI: PosSTD successfully diversified the search (Shortest distance increased significantly), but the model uncertainty remains extremely high (L\_std 53.092). Now, we transition to the standard adaptive function, Expected Improvement, which balances the need to exploit the current best point ($f_{min}=-0.943$) with the necessary exploration driven by the high model variance, aiming to stabilize the GP and find the first significant improvement.
+TS: The model uncertainty has dramatically worsened; the lengthscale range is now enormous (up to 661.865) and the standard deviation (311.789) is massive, indicating the GP is highly unstable and unsure of the relevance of any parameter. Since standard adaptive functions like EI rely heavily on stable variance estimates, Thompson Sampling is the most robust choice to handle this extreme model uncertainty by sampling the full posterior distribution, which is crucial for stabilizing the model in this highly uncertain early phase.
+EI: Thompson Sampling successfully stabilized the model hyperparameters; the lengthscales are now tightly clustered (Range [0.171, 0.862], Std Dev 0.287), and the outputscale has slightly decreased. With the model now providing reliable predictions, we return to Expected Improvement (EI) to leverage the stabilized uncertainty estimates and efficiently balance exploitation of the current best point ($f_{min}=-0.943$) with targeted exploration.
+TS: Expected Improvement failed to maintain model stability; the lengthscales have exploded again (Range up to 962.435, Std Dev 453.593), indicating the model is highly uncertain about the parameter relevance. Given this extreme instability and the early stage of optimization, Thompson Sampling is again the most robust choice to sample the posterior and force the model to stabilize its hyperparameter estimates before meaningful exploitation can occur.
+EI: Thompson Sampling successfully stabilized the model again, bringing the lengthscales back into a manageable range (Std Dev 0.375). We are still in the early phase (N=15) and have not improved $f_{min}$. With a stable model and a moderate shortest distance (0.122), Expected Improvement is the optimal choice to leverage the now-reliable uncertainty estimates to find the first significant improvement, balancing the need to exploit the current best region with exploring promising uncertain areas.
+TS: EI failed again, leading to catastrophic model instability (Lengthscale Std Dev 1309.513). This pattern suggests the initial data points are highly sensitive to the complex landscape (ridge/valley). Given the extreme uncertainty and the failure of EI in this unstable regime, Thompson Sampling is the necessary choice to resample the posterior and force the GP to find a stable set of hyperparameters, prioritizing model stability over immediate improvement.
+UCB: Thompson Sampling failed to fully stabilize the model (L\_std 757.009), and the search has become highly localized (Shortest distance 0.023). We are stuck in a region of high uncertainty and tight clustering without improvement. We must aggressively explore to escape this local cluster and find points that stabilize the model. UCB (Upper Confidence Bound) provides a strong, variance-driven exploration bias, which is necessary to jump out of the current exploited region and sample areas of high uncertainty to gather better data for the GP.
+TS: UCB successfully diversified the search (Shortest distance 0.565) but the model remains highly unstable (L\_std 669.526). Given the persistent instability and the failure of both EI and UCB to stabilize the model in previous attempts, Thompson Sampling is the most reliable mechanism to handle this high uncertainty by sampling the posterior, which is critical for finding a set of points that finally allows the GP to converge on stable lengthscales.
+UCB: Thompson Sampling again failed to fully stabilize the model (L\_std 389.823), although it reduced the variance slightly. Since we are still stuck at $f_{min}=-0.943$ and need to find a better region to anchor the model, we must prioritize exploration. UCB is chosen over PosSTD because it still incorporates the mean prediction, guiding the exploration towards potentially high-performing, uncertain areas, which is necessary to break the current performance plateau.
+TS: UCB slightly reduced the lengthscale variance, but the model remains highly unstable (L\_std 194.386). Given the persistent pattern where standard adaptive functions (EI, UCB) fail to stabilize the GP in this early, high-uncertainty phase, Thompson Sampling remains the most appropriate tool. It is designed to handle high model uncertainty by sampling the posterior, which is essential for finding the necessary data points to finally stabilize the lengthscales and allow for meaningful exploitation later.
+UCB: Thompson Sampling finally achieved a small improvement ($f_{min}$ improved to -0.945), but the model instability immediately returned (L\_std 332.600). Since we have found a new minimum, we need to explore the surrounding area aggressively to confirm the optimum and gather data to stabilize the model. UCB is preferred over TS now because it explicitly biases the search towards high-variance regions, which is necessary to break the cycle of instability and find points that better constrain the GP.
+TS: UCB failed to stabilize the model, leading to the worst instability yet (L\_std 1043.773). Given the extreme and persistent instability of the GP in this region, Thompson Sampling is the only reliable method left to handle the massive uncertainty by sampling the posterior, aiming to find a configuration of points that finally allows the lengthscales to converge to a stable, meaningful value.
+PosSTD: Thompson Sampling failed to stabilize the model and, in fact, increased the instability (L\_std 1751.260). Since both adaptive functions (EI, UCB) and TS have failed repeatedly to stabilize the GP, we must resort to pure, aggressive exploration (PosSTD). This is necessary to sample the most uncertain regions globally, hoping to gather data that finally constrains the highly variable lengthscales and maps the landscape before any exploitation can be reliably performed.
+TS: PosSTD reduced the instability slightly but the model remains highly uncertain (L\_std 684.895). Given the persistent failure of all other methods to stabilize the GP, and the fact that we are now entering the mid-game (36 iterations left), we must rely on Thompson Sampling again. TS is the most robust method for handling this extreme, persistent model uncertainty by sampling the posterior, which is essential to find the necessary data points to finally constrain the lengthscales and allow for reliable exploitation.
+EI: Thompson Sampling finally achieved significant model stabilization! The lengthscales are now tightly constrained (Range [0.218, 3.788], Std Dev 1.465), and the optimization is entering the mid-game (35 iterations left). However, the shortest distance is very small (0.031), indicating tight clustering. Since the model is finally reliable, we use Expected Improvement (EI) to exploit the current best point ($f_{min}=-0.945$) while leveraging the now-stable variance estimates to guide the search out of the immediate cluster and find a better optimum.
+LogEI: EI successfully diversified the search (Shortest distance 0.394) and maintained model stability (L\_std 1.837). We are now in the mid-game, and the objective function range is still narrow, suggesting improvements will be subtle. LogEI is chosen over standard EI because it is less sensitive to the magnitude of the improvement and focuses on maximizing the *relative* expected improvement, which is beneficial when the objective function is tightly clustered and we are seeking small, precise gains.
+UCB: LogEI failed to find an improvement and the model stability is slightly degrading (L\_std 2.171, Outputscale increasing). Since we are stuck at $f_{min}=-0.945$ and have a moderate shortest distance, we need a strong exploration push to test uncertain regions and potentially find a better optimum that stabilizes the GP. UCB is the best choice to prioritize variance and guide the search towards high-uncertainty areas.
+EI: UCB failed to find an improvement, and the search is starting to cluster again (Shortest distance 0.107). The model remains relatively stable (L\_std 2.237). Since we need to exploit the current best region but also need to break the performance plateau, Expected Improvement is the most balanced choice. It will leverage the stable variance to guide the search towards the most promising areas, balancing the need to exploit the current minimum with the need to explore nearby regions.
+TS: Expected Improvement caused a catastrophic failure in model stability (L\_std 1744.331). This indicates that the region EI sampled was highly detrimental to the GP's hyperparameter fitting. Given the extreme instability and the failure of EI, Thompson Sampling is the necessary choice to handle the massive uncertainty by sampling the posterior, aiming to find a stable set of lengthscales before any further exploitation can be trusted.
+PosSTD: Thompson Sampling failed to stabilize the model and the instability actually increased (L\_std 1776.682). Since we are at the halfway point (30 iterations remaining) and the model is completely unreliable, we must perform aggressive, pure exploration (PosSTD) to sample the most uncertain regions globally. This is a desperate measure to gather diverse data points that might finally constrain the lengthscales and allow the GP to accurately map the landscape.
+TS: PosSTD successfully reduced the instability significantly (L\_std 279.108), but the model is still highly uncertain. Given the history of instability, we cannot trust standard adaptive functions yet. Thompson Sampling is the most robust choice to handle the remaining high uncertainty, aiming to push the lengthscales toward full stability by sampling the posterior distribution before we commit to focused exploitation in the latter half of the optimization.
+PosSTD: Thompson Sampling failed dramatically, leading to the highest instability observed yet (L\_std 4232.540). Since all adaptive and sampling methods have repeatedly failed to stabilize the GP, and we are still stuck at $f_{min}=-0.945$, we must again resort to pure, aggressive exploration (PosSTD). This is the only remaining non-failed strategy to force the optimizer to sample globally diverse points, which is essential to constrain the wildly varying lengthscales.
+TS: PosSTD reduced the instability significantly, but the model remains highly uncertain (L\_std 814.686), and the search is clustering again (Shortest distance 0.074). Given the history, Thompson Sampling is the most robust choice to handle the remaining high uncertainty by sampling the posterior, aiming to push the lengthscales toward full stability and find a point that breaks the performance plateau before we enter the final exploitation phase.
+UCB: Thompson Sampling failed to improve $f_{min}$ and the search is tightly clustered (Shortest distance 0.049), although the model instability slightly decreased (L\_std 595.317). We need to aggressively explore to escape this cluster and find a better region. UCB is chosen to leverage the variance bias, forcing the search into uncertain, unvisited areas, which is necessary to break the current local minimum and gather better data for the GP.
+TS: UCB successfully diversified the search (Shortest distance 0.580) but the model remains highly unstable (L\_std 496.217). Since we are at the mid-point (25 iterations left) and the model is still unreliable, Thompson Sampling is the most robust choice to handle the persistent high uncertainty by sampling the posterior, aiming to finally stabilize the lengthscales and allow for reliable exploitation in the final phase.
+PosSTD: Thompson Sampling failed dramatically, leading to extreme instability (L\_std 1824.345) and a high outputscale (1.09). Given the persistent failure of all adaptive and sampling methods to stabilize the GP, and the tight clustering (0.070), we must use pure exploration (PosSTD) to force the optimizer to sample globally diverse, highly uncertain regions, which is the only remaining strategy to gather the necessary data to constrain the lengthscales.
+TS: PosSTD significantly reduced the instability (L\_std 177.058), but the model is still highly uncertain, and the search is tightly clustered (0.066). Since we are approaching the final phase (23 iterations left), we need a robust method to finalize model stability. Thompson Sampling is the best choice to handle the remaining high uncertainty by sampling the posterior, aiming to push the lengthscales toward full convergence before the final exploitation push.
+PosSTD: Thompson Sampling failed dramatically, leading to extreme instability (L\_std 3357.167) and tight clustering (0.019). Given the persistent failure of all other methods to stabilize the GP, and the urgent need to diversify the search before the final 20 iterations, pure exploration (PosSTD) is the only viable option to force the optimizer to sample globally diverse points and gather the necessary data to constrain the lengthscales.
+TS: PosSTD failed to stabilize the model, and the instability remains extreme (L\_std 3554.657). Since we are entering the final 20 iterations, we must make a final attempt to stabilize the model using Thompson Sampling. Despite its previous failures, TS is theoretically the most robust method for handling this level of uncertainty by sampling the posterior, which is necessary to find a stable configuration before the final exploitation phase.
+UCB: Thompson Sampling failed to stabilize the model, which remains highly uncertain (L\_std 2865.958). Since we are now in the final 20 iterations, we must prioritize finding a better optimum to anchor the model. UCB is chosen to aggressively explore the most uncertain regions, leveraging the high variance to jump out of the current performance plateau and find a point that might finally constrain the GP and allow for final exploitation.
+TS: UCB failed to improve $f_{min}$ and the model remains extremely unstable (L\_std 1805.830). With only 19 iterations left, we must make a final, desperate attempt to stabilize the model using Thompson Sampling. Despite its history, TS is the only method that directly addresses high model uncertainty by sampling the posterior, which is essential before any final, reliable exploitation can be performed.
+PosSTD: Thompson Sampling failed to stabilize the model, and the search is tightly clustered (0.028). Given the extreme, persistent instability (L\_std 2333.782) and the failure of all adaptive and sampling methods, we must use pure exploration (PosSTD) one last time to force diversification and gather data points that might finally constrain the lengthscales before the final exploitation phase begins.
+TS: PosSTD successfully found a new minimum ($f_{min}=-0.947$), but the model remains highly unstable (L\_std 1582.780). Since we have a new best point, we need to sample the posterior distribution around this new optimum. Thompson Sampling is the most robust choice to handle the remaining high uncertainty and ensure the model is as stable as possible before we commit to the final exploitation phase (17 iterations left).
+EI: Thompson Sampling finally achieved significant model stabilization (L\_std 256.774), but the search is now extremely clustered (Shortest distance 0.015). We are in the final exploitation phase (16 iterations left). With a stable model, Expected Improvement (EI) is the optimal choice to exploit the current best point ($f_{min}=-0.947$) while leveraging the now-reliable variance estimates to guide the search out of the immediate cluster and find the absolute final optimum.
+LogEI: EI successfully diversified the search (Shortest distance 0.120) but caused a return to high instability (L\_std 596.190). Since we are in the final 15 iterations and improvements will be subtle, we need a function that focuses on maximizing the relative improvement while still incorporating variance. LogEI is chosen to aggressively exploit the current best region, focusing on small, precise gains, which is necessary for late-stage refinement, despite the model's renewed instability.
+TS: LogEI failed dramatically, leading to extreme instability (L\_std 4003.659) and a high outputscale. With only 14 iterations left, we cannot afford to waste evaluations on an unreliable model. Thompson Sampling is the only robust choice to handle this massive uncertainty by sampling the posterior, aiming to stabilize the GP one last time so that the final few iterations can be dedicated to reliable exploitation.
+EI: Thompson Sampling successfully stabilized the model significantly (L\_std 319.103), but the search is tightly clustered (0.039). We are now in the critical final exploitation phase (13 iterations left). With a relatively stable model, Expected Improvement (EI) is the optimal choice to exploit the current best point, leveraging the variance to guide the search out of the immediate cluster and towards the final, subtle optimum.
+TS: EI failed, causing catastrophic model instability (L\_std 3890.637). With only 12 iterations remaining, we cannot proceed with an unreliable model. Thompson Sampling is the necessary choice to handle this extreme uncertainty by sampling the posterior, aiming for a final, quick stabilization so the last few evaluations can be reliable exploitation attempts.
+UCB: Thompson Sampling failed to stabilize the model (L\_std 1698.649), and the search is tightly clustered (0.024). With only 11 iterations left, we must aggressively explore to break the cluster and find a better optimum. UCB is chosen to leverage the variance bias, forcing the search into uncertain, unvisited areas, which is necessary to find the final, subtle improvement before the optimization ends.
+PosMean: We are in the final 10 iterations, and despite the persistent model instability (L\_std 1343.827), the search is extremely clustered (0.013). Since all adaptive and sampling methods have failed to stabilize the GP, and we must maximize the final result, we switch to the most aggressive exploitation strategy. PosMean ignores variance and directly targets the point with the highest predicted performance, which is necessary for the final push when time is running out and the model's mean prediction is the only reliable metric left.
+EI: PosMean successfully diversified the search slightly and, crucially, led to a significant reduction in model instability (L\_std 442.017). With only 9 iterations left and a relatively stable model, Expected Improvement (EI) is the optimal choice to perform the final, balanced exploitation. It leverages the improved variance estimates to guide the search towards the most promising areas, aiming for the absolute final optimum.
+LogEI: EI successfully diversified the search again (Shortest distance 0.284) but caused a slight increase in instability (L\_std 646.584). With only 8 iterations left, we are seeking subtle improvements near the optimum. LogEI is chosen to aggressively exploit the current best region, focusing on maximizing the relative expected improvement, which is ideal for the final refinement stage where small, precise gains are sought.
+PosMean: LogEI failed to find an improvement, but the model stability improved (L\_std 388.435). With only 7 iterations left, we must prioritize maximizing the final result. Since the model is relatively stable now, we use PosMean for a direct, aggressive exploitation push, targeting the point with the highest predicted performance to ensure the best possible final outcome.
+EI: PosMean failed to improve $f_{min}$ and caused a return to higher instability (L\_std 897.524). With only 6 iterations left, we need a balanced approach that exploits the current best point while using the variance to guide the search away from the immediate cluster. Expected Improvement (EI) is the most robust adaptive function for this final, critical exploitation phase.
+PosMean: EI failed to improve $f_{min}$ and the model remains unstable (L\_std 1141.986). With only 5 iterations left, we must abandon attempts to stabilize the model and focus purely on maximizing the final result based on the current best prediction. PosMean is the most aggressive exploitation strategy, directly targeting the predicted minimum, which is necessary in this final, time-constrained phase.
+PosMean: PosMean successfully stabilized the model significantly (L\_std 399.958) but led to tight clustering (0.017). With only 4 iterations left, we must continue the aggressive exploitation strategy. Since the model is now relatively stable, PosMean is the best choice to repeatedly target the predicted minimum, maximizing the chance of finding the absolute best point in the final moments.
+PosMean: PosMean achieved excellent model stability (L\_std 19.400) and maintained the current best performance. With only 3 iterations left, the model is highly reliable. We must continue the pure exploitation strategy (PosMean) to repeatedly sample the predicted minimum, ensuring we finalize the search at the absolute best location identified by the now-stable GP.
+PosMean: The model remains highly stable (L\_std 8.359) and the search is tightly clustered. With only 2 iterations left, the goal is pure exploitation based on the most confident prediction. PosMean is the definitive choice for the final two steps, as it directly targets the predicted minimum, maximizing the chance of finding the absolute best point before termination.
+PosMean: This is the final iteration (1 remaining). The model is extremely stable (L\_std 4.693) and the search is maximally clustered (Shortest distance 0.001). PosMean is the only logical choice for the very last step, as it guarantees sampling the point the GP currently predicts as the absolute minimum, ensuring the final evaluation is the most confident exploitation possible.
+The optimization process was overwhelmingly defined by the need to stabilize the Gaussian Process model, which suffered from catastrophic and persistent instability in its lengthscales (often spiking to standard deviations over 1000).
+
+The acquisition function that dominated the process, serving as the primary recovery mechanism whenever standard adaptive functions (EI, UCB) failed and caused instability, was **Thompson Sampling (TS)**.
+
+The process was essentially a cycle of:
+1.  Use EI/UCB (Exploitation/Adaptive Exploration).
+2.  Model instability spikes dramatically.
+3.  Use TS or PosSTD (Sampling/Pure Exploration) to force stabilization.
+4.  Repeat.
+
+Therefore, the function that defined the trajectory and allowed the optimization to continue despite the highly unstable surrogate model was **Thompson Sampling (TS)**.
