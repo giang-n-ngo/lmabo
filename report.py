@@ -86,6 +86,89 @@ methods_order_curated = [
     "esp-curated",
 ]
 
+methods_order = [
+    "PI", 
+    "LogPI",
+    "EI",
+    "LogEI",
+    "PosMean",
+    "PosSTD",
+    "UCB",
+    "TS",
+    "qKG",
+    "qPES",
+    "qMES",
+    "qJES",
+    "random_acq",
+    "random_acq_curated2",
+    "random_acq_curated1",
+    "bo_alternating_k1",
+    "bo_alternating_k3",
+    "bo_alternating_k5",
+    "bo_explore_exploit",
+    "llambo",
+    "llmgp",
+    "gphedge",
+    "no_past_bo",
+    "setup_bo",
+    "esp",
+    "lmabo",
+]
+
+methods_order_ablation = [
+    "lmabo-ab1",
+    "lmabo-ab2",
+    "lmabo-ab3",
+    "lmabo-ab4",
+    "lmabo-ops",
+    "lmabo-ops3",
+    "lmabo-ops6",
+    "lmabo-gpt",
+    "lmabo",
+]
+
+method_name_mapping = {
+    "PosSTD": "PosSTD",
+    "PosMean": "PosMean",
+    "PI": "PI", 
+    "LogPI": "LogPI",
+    "EI": "EI",
+    "LogEI": "LogEI",
+    "UCB": "UCB",
+    "TS": "TS",
+    "qKG": "KG",
+    "qPES": "PES",
+    "qMES": "MES",
+    "qJES": "JES",
+    "llambo": "LLAMBO",
+    "llmgp": "LLMP",
+    "random_acq": "Random",
+    "random_acq_curated1": "Random (EI, LogEI, TS)",
+    "random_acq_curated2": "Random (EI, TS, UCB, PosMean)",
+    "bo_alternating_k1": "Alt-EI-TS-1",
+    "bo_alternating_k3": "Alt-EI-TS-3",
+    "bo_alternating_k5": "Alt-EI-TS-5",
+    "bo_explore_exploit": "TwoPhase-TS-EI",
+    "gphedge": "GP-Hedge",
+    "gphedge-curated": "GP-Hedge-Curated",
+    "no_past_bo": "No-PASt-BO",
+    "no_past_bo-curated": "No-PASt-BO-Curated",
+    "setup_bo": "SETUP-BO",
+    "setup_bo-curated": "SETUP-BO-Curated",
+    "esp": "ESP",
+    "esp-curated": "ESP-Curated",
+    "lmabo": "LMABO",
+    "lmabo-context": "LMABO-Context",
+    "lmabo-gpt": "LMABO (GPT-4o mini)",
+    "lmabo-ab1": "LMABO-AB1",
+    "lmabo-ab2": "LMABO-AB2",
+    "lmabo-ab3": "LMABO-AB3",
+    "lmabo-ab4": "LMABO-AB4",
+    "lmabo-ops": "LMABO-8B",
+    "lmabo-ops3": "LMABO-30B",
+    "lmabo-ops6": "LMABO-120B",
+}
+
 def read_raw_result(problem, acq_type, result_type):
     raw_result = []
     for exp_idx in range(EXP_RUNS):
@@ -229,85 +312,6 @@ def rank_methods_by_problem(rel_performance_df, problem):
     # print full df without new line
     print(ranked_df.to_string(index=False))
 
-methods_order = [
-    "PosSTD",
-    "PosMean",
-    "PI", 
-    "LogPI",
-    "EI",
-    "LogEI",
-    "UCB",
-    "TS",
-    "qKG",
-    "qPES",
-    "qMES",
-    "qJES",
-    "llambo",
-    "llmgp",
-    "random_acq",
-    "random_acq_curated1",
-    "random_acq_curated2",
-    "gphedge",
-    "no_past_bo",
-    "setup_bo",
-    "esp",
-    "lmabo",
-]
-
-methods_order_ablation = [
-    "lmabo-ab1",
-    "lmabo-ab2",
-    "lmabo-ab3",
-    "lmabo-ab4",
-    # "lmabo-ab5",
-    "lmabo-ops",
-    # "lmabo-ops2",
-    "lmabo-ops3",
-    "lmabo-ops6",
-    "lmabo",
-    "lmabo-gpt",
-]
-
-method_name_mapping = {
-    "PosSTD": "PosSTD",
-    "PosMean": "PosMean",
-    "PI": "PI", 
-    "LogPI": "LogPI",
-    "EI": "EI",
-    "LogEI": "LogEI",
-    "UCB": "UCB",
-    "TS": "TS",
-    "qKG": "KG",
-    "qPES": "PES",
-    "qMES": "MES",
-    "qJES": "JES",
-    "llambo": "LLAMBO",
-    "llmgp": "LLMP",
-    "random_acq": "Random AF",
-    "random_acq_curated1": "Random AF (3)",
-    "random_acq_curated2": "Random AF (4)",
-    "gphedge": "GP-Hedge",
-    "gphedge-curated": "GP-Hedge-Curated",
-    "no_past_bo": "No-PASt-BO",
-    "no_past_bo-curated": "No-PASt-BO-Curated",
-    "setup_bo": "SETUP-BO",
-    "setup_bo-curated": "SETUP-BO-Curated",
-    "esp": "ESP",
-    "esp-curated": "ESP-Curated",
-    "lmabo": "LMABO",
-    "lmabo-context": "LMABO-Context",
-    "lmabo-gpt": "LMABO-GPT",
-    "lmabo-ab1": "LMABO-AB1",
-    "lmabo-ab2": "LMABO-AB2",
-    "lmabo-ab3": "LMABO-AB3",
-    "lmabo-ab4": "LMABO-AB4",
-    # "lmabo-ab5": "LMABO-AB5",
-    "lmabo-ops": "LMABO-8B",
-    # "lmabo-ops2": "LMABO-14B",
-    "lmabo-ops3": "LMABO-30B",
-    "lmabo-ops6": "LMABO-120B",
-}
-
 def get_mean_iqr_summary(rel_performance_df):
     # rel_performance_df: columns: method, problem, relative_performance, problem_rank
 
@@ -350,25 +354,26 @@ def summary_to_latex(
         avg_cv, 
         filename="summary.tex", 
         pairwise_p_rel=None, 
-        pairwise_p_rank=None
+        pairwise_p_rank=None,
+        friedman_res=None
     ):
     # header/footer unchanged
     header = r"""
-    \begin{table}
-    \caption{
-        \textbf{Overall performance comparison of LMABO against all baselines across 60 optimization problems}. 
-        The p-values from the Friedman test in the last row indicate statistically significant differences among methods for both RP and rank.
-        The p-values from the one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction are shown next to the reported metric value of each method.
-        It should be noted that both RP and rank include ablation methods (which is why the maximum rank is 23 instead of 19).
-        Separate results for the ablation methods are provided in Table \ref{tab:ablation}.
-    }
-    \label{tab:aggregated}
-    \centering
-    \renewcommand{\arraystretch}{1.2}
-    \begin{tabular}{@{}lccccc@{}}
-    \toprule
-    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
-    \multicolumn{5}{l}{\textit{Static Acquisition Functions}} \\
+\begin{table}
+\caption{
+\textbf{Overall performance comparison of LMABO against all baselines across 50 optimization problems}. 
+P-values from Friedman tests in the last row indicate statistically significant differences among methods for both RP and rank.
+The third and fifth columns show p-values of post-hoc pairwise comparisons between LMABO and each method, which confirm that the differences in performance between LMABO and all methods are significant.
+Exploitative AFs are marked in \textcolor{blue}{blue} and explorative AFs are marked in \textcolor{magenta}{magenta} (see Appendix \ref{appendix:acquisition_functions} for details).
+}
+\label{tab:aggregated}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+\midrule
+\multicolumn{5}{l}{\textit{Static Acquisition Functions}} \\
     """
     footer = r"""\bottomrule
     \end{tabular}
@@ -401,11 +406,18 @@ def summary_to_latex(
 
         rows.append(f"{display} & {perf_str} & {p_rel_str} & {rank_str} & {p_rank_str} & {cv_str} \\\\")
         if m == "qJES":
+            rows.append(r"\midrule")
+            rows.append(r"\multicolumn{5}{l}{\textit{Simple Meta-strategies}} \\")
+        elif m == "bo_explore_exploit":
+            rows.append(r"\midrule")
             rows.append(r"\multicolumn{5}{l}{\textit{LLM-based Methods}} \\")
         elif m == "llmgp":
+            rows.append(r"\midrule")
             rows.append(r"\multicolumn{5}{l}{\textit{Adaptive Portfolio Methods}} \\")
         elif m == "esp":
             rows.append(r"\midrule")
+    # finally add a row for Friedman test p-values
+    rows.append(f"\multicolumn{{2}}{{l}}{{\textit{{P-values of Friedman Tests}}}} & {friedman_res['rel']['p']:.3e} & & {friedman_res['rank']['p']:.3e} & \\")
 
     table = header + "\n".join(rows) + "\n" + footer
     with open(filename, "w") as f:
@@ -421,20 +433,21 @@ def ablation_summary_to_latex(
     ):
     # header/footer unchanged
     header = r"""
-    \begin{table}
-    \caption{
-        \textbf{Ablation study on the components of LMABO}. 
-        We analyze the contribution of LMABO's key components by comparing the full model to four ablated versions: LMABO-AB1, LMABO-AB2, and LMABO-AB3, which remove the remaining budget, GP model characteristics, and shortest distance information, respectively; and LMABO-OPS, which uses a smaller language model (Qwen3-8B). 
-        The Mean RP and Mean Rank are calculated using the same global ranking of all baseline and ablation methods as in Table \ref{tab:aggregated}. 
-        The p-values from a one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction compare each ablated model against the full LMABO.
-    }
-    \label{tab:ablation}
-    \centering
-    \renewcommand{\arraystretch}{1.2}
-    \begin{tabular}{@{}lccrr@{}}
-    \toprule
-    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
-    \multicolumn{5}{l}{\textit{Ablation Methods}} \\
+\begin{table}
+\caption{
+    \textbf{Ablation study on the components of LMABO}. 
+    We analyze the contribution of LMABO's key components by comparing the full model to four ablated versions: LMABO-AB1, LMABO-AB2, and LMABO-AB3, which remove the remaining budget, GP model characteristics, and shortest distance information, respectively; and LMABO-OPS, which uses a smaller language model (Qwen3-8B). 
+    The Mean RP and Mean Rank are calculated using the same global ranking of all baseline and ablation methods as in Table \ref{tab:aggregated}. 
+    The p-values from a one-sided Wilcoxon signed-rank test with Holm-Bonferroni correction compare each ablated model against the full LMABO.
+}
+\label{tab:ablation}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lccrr@{}}
+\toprule
+\textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+\midrule
+\multicolumn{5}{l}{\textit{LMABO without}} \\
     """
     footer = r"""
     \bottomrule
@@ -467,7 +480,10 @@ def ablation_summary_to_latex(
         cv_str = f"{cv:.3f}" if cv is not None else "--"
 
         rows.append(f"{display} & {perf_str} & {p_rel_str} & {rank_str} & {p_rank_str} & {cv_str} \\\\")
-        if m == "lmabo-ops2":
+        if m == "lmabo-ab4":
+            rows.append(r"\midrule")
+            rows.append(r"\multicolumn{5}{l}{\textit{LMABO using other LLMs}} \\")
+        if m == "lmabo-gpt":
             rows.append(r"\midrule")
 
     table = header + "\n".join(rows) + "\n" + footer
@@ -484,16 +500,17 @@ def curated_summary_to_latex(
 ):
         # header/footer unchanged
     header = r"""
-    \begin{table}
-    \caption{
-        \textbf{Comparing adaptive portfolio methods between using a large portfolio and a curated portfolio}. 
-    }
-    \label{tab:curated}
-    \centering
-    \renewcommand{\arraystretch}{1.2}
-    \begin{tabular}{@{}lccrr@{}}
-    \toprule
-    \textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+\begin{table}
+\caption{
+    \textbf{Comparing adaptive portfolio methods between using a large portfolio and a curated portfolio}. 
+}
+\label{tab:curated}
+\centering
+\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{@{}lccrr@{}}
+\toprule
+\textbf{Method} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean RP} \\ \textbf{(Interquartile Range)} \end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(RP)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{Mean Rank} \\ \textbf{(Min - Max)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{P-value} \\ \textbf{(Rank)}\end{tabular} & \begin{tabular}[c]{@{}c@{}}\textbf{CV of} \\ \textbf{(AUC)}\end{tabular}\\
+\midrule
     """
     footer = r"""
     \bottomrule
@@ -736,6 +753,7 @@ if __name__=="__main__":
             filename=f"{summary_root}/{args.setting}.tex",
             pairwise_p_rel=pairwise_p_rel,
             pairwise_p_rank=pairwise_p_rank,
+            friedman_res=stats_res["friedman"],
         )
         if args.setting == "full":
             # also generate ablation table
@@ -758,7 +776,7 @@ if __name__=="__main__":
         # # optional: save pairwise table for inspection
         # pairwise_df.to_csv("pairwise_holm_pvalues.csv")
     except Exception as e:
-        print(f"Statistical testing failed: {e}")
+        raise e
 
     # Don't forget to close the file
     sys.stdout.close()
