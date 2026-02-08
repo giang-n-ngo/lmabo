@@ -90,12 +90,15 @@ The experiment with using context can be run as follows:
 python run.py --problem Ackley --method lmabo-context
 ```
 3. Statistical significance tests
-To replicate the statistical tests mentioned in the paper, 
+To replicate the statistical tests mentioned in the paper, run the following command:
+```
+python report.py
+```
 
 ## Citation
 ```bibtex
-@inproceedings{ngo2026adaptively,
-  title={Adaptively Selecting Acquisition Function for Bayesian Optimization Using Large Language Models},
+@inproceedings{ngo2026lmabo,
+  title={Adaptive Acquisition Selection for Bayesian Optimization with Large Language Models},
   author={Ngo, Giang and Phan Trong, Dat and Nguyen, Dang and Gupta, Sunil and Venkatesh, Svetha},
   booktitle={Proceedings of the 13th International Conference on Learning Representations},
   year={2026},
