@@ -3,7 +3,6 @@ import pandas as pd
 import json
 import os
 import sys
-import argparse
 from scipy import stats
 from statsmodels.stats.multitest import multipletests
 
@@ -633,51 +632,11 @@ def run_stats_on_rel_perf_and_ranks(rel_performance_df, completed_problems, cont
     return {"friedman": friedman_res, "pairwise": pairwise_df, "methods": methods}
 
 if __name__=="__main__":
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(description="Generate BO experiment report")
-    parser.add_argument(
-        "--setting",
-        type=str,
-        default="full",
-        choices=["full", "hd", "synthetic", "real"],
-        help="Summary setting: full problem lists or something else",
-    )
-    args = parser.parse_args()
-    sys.stdout = open(f"report_bo_{args.setting}.txt", 'w')
+    sys.stdout = open(f"report_bo.txt", 'w')
 
     all_methods = list(ACQ_TYPE_MAPPING.keys())
     all_methods.extend(list(ALGO_FILE_COUNT.keys()))
-    # all_problems = OBJECTIVE_FUNCTIONS_NAMES
-    if args.setting == "full":
-        all_problems = final_problems
-    elif args.setting == "hd":
-        # high-dimensional problems only
-        all_problems = [
-            "Ackley",
-            "Rosenbrock",
-            "Rastrigin",
-            "StyblinskiTang",
-        ]
-        # remove ablation methods from all_methods
-        ablation_methods = [
-            "lmabo-ab1",
-            "lmabo-ab2",
-            "lmabo-ab3",
-            "lmabo-ab4",
-            # "lmabo-ab5",
-            "lmabo-ops",
-            # "lmabo-ops2",
-            "lmabo-ops3",
-            "lmabo-ops6",
-        ]
-        all_methods = [method for method in all_methods if method not in ablation_methods]
-    elif args.setting == "synthetic":
-        from constants import BOTORCH_FUNCTIONS_NAMES, COCO_FUNCTIONS_NAMES
-        # find the ones in final_problems and in botorch or coco
-        all_problems = [p for p in final_problems if p in BOTORCH_FUNCTIONS_NAMES or p in COCO_FUNCTIONS_NAMES]
-    elif args.setting == "real":
-        from constants import HPT_FUNCTIONS_NAMES
-        all_problems = [p for p in final_problems if p in HPT_FUNCTIONS_NAMES]
+    all_problems = final_problems
     # exclude some methods during the main report
     excluded_methods = [
         "lmabo-context",
@@ -696,7 +655,7 @@ if __name__=="__main__":
         all_methods
     )
     # save empirical_optimum to a json file for future reference
-    with open(f"{NUMERICAL_RESULTS_DIR}/empirical_optimum_{args.setting}.json", "w") as f:
+    with open(f"{NUMERICAL_RESULTS_DIR}/empirical_optimum_full.json", "w") as f:
         json.dump(empirical_optimum, f, indent=4)
     all_simple_regrets = cal_simple_regret(all_raw_results, empirical_optimum)
     agg_simple_regrets_df = aggregate_and_to_df(all_simple_regrets, "auc")
@@ -704,7 +663,7 @@ if __name__=="__main__":
     best_auc = {}
     for problem in agg_simple_regrets_df["problem"].unique():
         best_auc[problem] = agg_simple_regrets_df[agg_simple_regrets_df["problem"] == problem].iloc[:, 2:-1].min().min()
-    with open(f"{NUMERICAL_RESULTS_DIR}/best_auc_{args.setting}.json", "w") as f:
+    with open(f"{NUMERICAL_RESULTS_DIR}/best_auc_full.json", "w") as f:
         json.dump(best_auc, f, indent=4)
     avg_cv = calculate_coefficient_of_variation(agg_simple_regrets_df)
     rel_performance_df = get_relative_performance_and_rank(agg_simple_regrets_df, completed_problems)
@@ -750,31 +709,27 @@ if __name__=="__main__":
         summary_to_latex(
             summary_df,
             avg_cv,
-            filename=f"{summary_root}/{args.setting}.tex",
+            filename=f"{summary_root}/full.tex",
             pairwise_p_rel=pairwise_p_rel,
             pairwise_p_rank=pairwise_p_rank,
             friedman_res=stats_res["friedman"],
         )
-        if args.setting == "full":
-            # also generate ablation table
-            ablation_summary_to_latex(
-                summary_df,
-                avg_cv,
-                filename=f"{summary_root}/ablation.tex",
-                pairwise_p_rel=pairwise_p_rel,
-                pairwise_p_rank=pairwise_p_rank,
-            )
-            # also generate curated table
-            curated_summary_to_latex(
-                summary_df,
-                avg_cv,
-                filename=f"{summary_root}/curated.tex",
-                pairwise_p_rel=pairwise_p_rel,
-                pairwise_p_rank=pairwise_p_rank,
-            )
-
-        # # optional: save pairwise table for inspection
-        # pairwise_df.to_csv("pairwise_holm_pvalues.csv")
+        # also generate ablation table
+        ablation_summary_to_latex(
+            summary_df,
+            avg_cv,
+            filename=f"{summary_root}/ablation.tex",
+            pairwise_p_rel=pairwise_p_rel,
+            pairwise_p_rank=pairwise_p_rank,
+        )
+        # also generate curated table
+        curated_summary_to_latex(
+            summary_df,
+            avg_cv,
+            filename=f"{summary_root}/curated.tex",
+            pairwise_p_rel=pairwise_p_rel,
+            pairwise_p_rank=pairwise_p_rank,
+        )
     except Exception as e:
         raise e
 
